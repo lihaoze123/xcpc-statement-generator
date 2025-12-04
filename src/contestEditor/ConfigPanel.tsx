@@ -1,8 +1,8 @@
 import { type FC } from "react";
-import { Card, Form, Input, Button, Space, Switch } from "antd";
+import { Card, Form, Input, Button, Space, Switch, Select } from "antd";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlus, faTrash } from "@fortawesome/free-solid-svg-icons";
-import type { Contest } from "@/types/contest";
+import type { Contest, ProblemFormat } from "@/types/contest";
 
 interface ConfigPanelProps {
   contestData: Contest;
@@ -49,6 +49,20 @@ const ConfigPanel: FC<ConfigPanelProps> = ({ contestData, updateContestData }) =
             />
             <span style={{ marginLeft: 8 }}>生成标题页</span>
           </Form.Item>
+          <Form.Item>
+            <Switch
+              checked={contestData.meta.enable_header_footer}
+              onChange={(checked) => updateContestData((d) => { d.meta.enable_header_footer = checked; })}
+            />
+            <span style={{ marginLeft: 8 }}>显示页眉/页尾</span>
+          </Form.Item>
+          <Form.Item>
+            <Switch
+              checked={contestData.meta.enable_problem_list}
+              onChange={(checked) => updateContestData((d) => { d.meta.enable_problem_list = checked; })}
+            />
+            <span style={{ marginLeft: 8 }}>显示试题列表</span>
+          </Form.Item>
         </Form>
       </Card>
 
@@ -63,6 +77,20 @@ const ConfigPanel: FC<ConfigPanelProps> = ({ contestData, updateContestData }) =
                   value={problem.problem.display_name}
                   onChange={(e) => updateContestData((d) => { d.problems[index].problem.display_name = e.target.value; })}
                 />
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 12, color: "#666", whiteSpace: "nowrap" }}>格式:</span>
+                  <Select<ProblemFormat>
+                    size="small"
+                    value={problem.problem.format || "latex"}
+                    onChange={(value) => updateContestData((d) => { d.problems[index].problem.format = value; })}
+                    options={[
+                      { label: "LaTeX", value: "latex" },
+                      { label: "Markdown", value: "markdown" },
+                      { label: "Typst", value: "typst" },
+                    ]}
+                    style={{ flex: 1 }}
+                  />
+                </div>
                 <Input.TextArea
                   size="small"
                   placeholder="题目描述"
@@ -86,7 +114,7 @@ const ConfigPanel: FC<ConfigPanelProps> = ({ contestData, updateContestData }) =
                 />
                 <Input.TextArea
                   size="small"
-                  placeholder="约束条件"
+                  placeholder="提示"
                   value={problem.statement.notes || ""}
                   onChange={(e) => updateContestData((d) => { d.problems[index].statement.notes = e.target.value; })}
                   rows={2}

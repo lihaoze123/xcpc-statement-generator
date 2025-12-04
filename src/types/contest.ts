@@ -8,11 +8,13 @@ export interface Sample {
   output: string;
 }
 
+// 题目格式类型
+export type ProblemFormat = "typst" | "latex" | "markdown";
+
 // 题目元数据
 export interface ProblemMetadata {
   display_name: string;
-  latex?: boolean;
-  markdown?: boolean;
+  format?: ProblemFormat; // 默认为 typst
   samples: Sample[];
 }
 
@@ -37,6 +39,8 @@ export interface ContestMetadata {
   author: string;
   date: string;
   enable_titlepage: boolean;
+  enable_header_footer: boolean;
+  enable_problem_list: boolean;
 }
 
 // 完整的比赛配置

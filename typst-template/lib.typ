@@ -5,9 +5,10 @@
 #let md = cmarker-render.with(math: mitex)
 
 #let fonts = (
-  serif: ("New Computer Modern", "FZShuSong-Z01"),
+  serif: ("New Computer Modern Math", "FZShuSong-Z01"),
   sans: ("CMU Sans Serif", "FZHei-B01"),
-  kaishu: ("FZKai-Z03")
+  kaishu: ("FZKai-Z03",),
+  mono: ("FiraCode Nerd Font",)
 )
 
 #let maketitle(
@@ -44,30 +45,31 @@
   = #text(font: fonts.sans, size: 20pt)[#problem.display-name]
   #v(10pt)
 
-  #if problem.at("latex", default: false) {
+  #let format = problem.at("format", default: "latex")
+  #if format == "latex" {
     mitext(statement.description)
-  } else if problem.at("markdown", default: false) {
+  } else if format == "markdown" {
     md(statement.description)
   } else {
     eval(statement.description, mode: "markup")
   }
 
-  #if statement.input != none [
+  #if statement.at("input", default: none) != none and statement.input != "" [
     == #text(font: fonts.sans, size: 15pt)[输入格式]
-    #if problem.at("latex", default: false) {
+    #if format == "latex" {
       mitext(statement.input)
-    } else if problem.at("markdown", default: false) {
+    } else if format == "markdown" {
       md(statement.input)
     } else {
       eval(statement.input, mode: "markup")
     }
   ]
 
-  #if statement.output != none [
+  #if statement.at("output", default: none) != none and statement.output != "" [
     == #text(font: fonts.sans, size: 15pt)[输出格式]
-    #if problem.at("latex", default: false) {
+    #if format == "latex" {
       mitext(statement.output)
-    } else if problem.at("markdown", default: false) {
+    } else if format == "markdown" {
       md(statement.output)
     } else {
       eval(statement.output, mode: "markup")
@@ -77,22 +79,23 @@
   #if problem.samples.len() > 0 [
     == #text(font: fonts.sans, size: 15pt)[样例]
 
+    #show raw: set text(font: fonts.mono)
     #figure(
       table(
         columns: (7.2cm, 7.2cm),
         align: (x, y) => if y == 0 { center } else { left },
         stroke: 0.4pt,
         table.header([标准输入], [标准输出]),
-        ..problem.samples.map(s => (raw(s.input, block: true), raw(s.output, block: true))).flatten(),
+        ..problem.samples.map(s => (raw(s.input), raw(s.output))).flatten(),
       ),
     )
   ]
 
-  #if statement.notes != none [
+  #if statement.at("notes", default: none) != none and statement.notes != "" [
     == #text(font: fonts.sans, size: 15pt)[提示]
-    #if problem.at("latex", default: false) {
+    #if format == "latex" {
       mitext(statement.notes)
-    } else if problem.at("markdown", default: false) {
+    } else if format == "markdown" {
       md(statement.notes)
     } else {
       eval(statement.notes, mode: "markup")
@@ -109,6 +112,8 @@
   date: datetime.today().display("[year] 年 [month] 月[day] 日"),
   problems: none,
   enable-titlepage: true,
+  enable-header-footer: true,
+  enable-problem-list: true,
   doc,
 ) = {
   set text(lang: "zh", font: fonts.serif)
@@ -123,37 +128,39 @@
     maketitle(title: title, subtitle: subtitle, date: date, author: author)
 
     // TOC
-    figure(
-      placement: bottom,
-      [
-        #text(size: 12pt, font: fonts.sans)[试题列表]
+    if enable-problem-list {
+      figure(
+        placement: bottom,
+        [
+          #text(size: 12pt, font: fonts.sans)[试题列表]
 
-        #set table(stroke: (x, y) => (
-          if y == 0 {
-            (top: 0.4pt, left: 0.4pt, right: 0.4pt)
-          } else if y == problems.len() - 1 {
-            (bottom: 0.4pt, left: 0.4pt, right: 0.4pt)
-          } else {
-            (left: 0.4pt, right: 0.4pt)
-          }
-        ))
+          #set table(stroke: (x, y) => (
+            if y == 0 {
+              (top: 0.4pt, left: 0.4pt, right: 0.4pt)
+            } else if y == problems.len() - 1 {
+              (bottom: 0.4pt, left: 0.4pt, right: 0.4pt)
+            } else {
+              (left: 0.4pt, right: 0.4pt)
+            }
+          ))
 
-        #table(
-          columns: (1.4cm, 6cm),
-          align: center,
-          // stroke: 0.4pt,
-          ..problems.enumerate().map(((i, e)) => (
-            str.from-unicode(int(i) + 65), e.problem.display_name
-          )).flatten()
-        )
+          #table(
+            columns: (1.4cm, 6cm),
+            align: center,
+            // stroke: 0.4pt,
+            ..problems.enumerate().map(((i, e)) => (
+              str.from-unicode(int(i) + 65), e.problem.display_name
+            )).flatten()
+          )
 
-        #v(0.8cm)
+          #v(0.8cm)
 
-        本试题册共 #problems.len() 题，#context counter(page).final().at(0) 页。
+          本试题册共 #problems.len() 题，#context counter(page).final().at(0) 页。
 
-        如果您的试题册缺少页面，请立即通知志愿者。
-      ],
-    )
+          如果您的试题册缺少页面，请立即通知志愿者。
+        ],
+      )
+    }
   }
 
   // 题面
@@ -164,25 +171,29 @@
 
     set page(
       margin: (top: 3cm, bottom: 2.5cm, x: 2.5cm),
-      header: [
-        #set text(size: 10pt)
-        #grid(
-          columns: (1fr, 1fr),
-          align: (left, right),
-          [#title], [#date],
-        )
-        #v(-0.1cm)
-        #line(length: 100%, stroke: 0.5pt)
-      ],
-      footer: context [
-        #set align(center)
-        #line(length: 100%, stroke: 0.5pt)
-        #set text(font: fonts.sans)
-        #counter(page).display(
-          numbly("{1}", { "Page {1} of {2}" }),
-          both: true,
-        )
-      ],
+      header: if enable-header-footer {
+        [
+          #set text(size: 10pt)
+          #grid(
+            columns: (1fr, 1fr),
+            align: (left, right),
+            [#title], [#date],
+          )
+          #v(-0.1cm)
+          #line(length: 100%, stroke: 0.5pt)
+        ]
+      },
+      footer: if enable-header-footer {
+        context [
+          #set align(center)
+          #line(length: 100%, stroke: 0.5pt)
+          #set text(font: fonts.sans)
+          #counter(page).display(
+            numbly("{1}", { "Page {1} of {2}" }),
+            both: true,
+          )
+        ]
+      },
     )
 
     counter(page).update(1)

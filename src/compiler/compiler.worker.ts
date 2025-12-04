@@ -120,8 +120,7 @@ function buildTypstDocument(contest: Contest): string {
     problems: contest.problems.map((p) => ({
       problem: {
         display_name: p.problem.display_name,
-        latex: p.problem.latex ?? false,
-        markdown: p.problem.markdown ?? true,
+        format: p.problem.format || "latex",
         samples: p.problem.samples.map(s => ({ input: s.input, output: s.output }))
       },
       statement: {
@@ -131,7 +130,9 @@ function buildTypstDocument(contest: Contest): string {
         notes: p.statement.notes || null
       }
     })),
-    enableTitlepage: contest.meta.enable_titlepage
+    enableTitlepage: contest.meta.enable_titlepage,
+    enableHeaderFooter: contest.meta.enable_header_footer,
+    enableProblemList: contest.meta.enable_problem_list
   };
 
   return `#import "/lib.typ": contest-conf
@@ -144,9 +145,8 @@ function buildTypstDocument(contest: Contest): string {
   problems: (${data.problems.map((p) => `(
     problem: (
       display_name: "${escapeTypstString(p.problem.display_name)}",
-      latex: ${p.problem.latex},
-      markdown: ${p.problem.markdown},
-      samples: (${p.problem.samples.map((s) => `(input: "${escapeTypstString(s.input)}", output: "${escapeTypstString(s.output)}")`).join(", ")},)
+      format: "${p.problem.format}",
+      samples: (${p.problem.samples.map((s) => `(input: "${escapeTypstString(s.input)}", output: "${escapeTypstString(s.output)}")`).join(", ")}${p.problem.samples.length === 1 ? ',' : ''})
     ),
     statement: (
       description: "${escapeTypstString(p.statement.description)}",
@@ -154,8 +154,10 @@ function buildTypstDocument(contest: Contest): string {
       ${p.statement.output ? `output: "${escapeTypstString(p.statement.output)}",` : ""}
       ${p.statement.notes ? `notes: "${escapeTypstString(p.statement.notes)}"` : ""}
     )
-  )`).join(", ")}),
-  enable-titlepage: ${data.enableTitlepage}
+  )`).join(", ")}${data.problems.length === 1 ? ',' : ''}),
+  enable-titlepage: ${data.enableTitlepage},
+  enable-header-footer: ${data.enableHeaderFooter},
+  enable-problem-list: ${data.enableProblemList}
 )`;
 }
 
