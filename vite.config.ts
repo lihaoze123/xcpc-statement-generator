@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import { defineConfig, type UserConfig, type PluginOption } from "vite";
 import react from "@vitejs/plugin-react";
+import { exec } from "node:child_process";
 
 export default defineConfig(async (): Promise<UserConfig> => {
   const TypstFontUrlEntriesPlugin = (): PluginOption => {
@@ -64,6 +65,18 @@ export default defineConfig(async (): Promise<UserConfig> => {
     };
   };
 
+  const gitCommitHash = await new Promise<undefined | string>((resolve) =>
+    exec("git rev-parse --short HEAD", (err, stdout) => {
+      if (err) resolve(undefined);
+      else resolve(stdout.trim());
+    }),
+  );
+
+  const isDirty = await new Promise<boolean>((resolve) =>
+    exec("git diff-index --quiet HEAD", (err) => resolve(Boolean(err))),
+  );
+
+
   return {
     base: "./",
     plugins: [react(), TypstFontUrlEntriesPlugin()],
@@ -74,6 +87,14 @@ export default defineConfig(async (): Promise<UserConfig> => {
         { find: "assets", replacement: resolve("assets") },
       ],
     },
+    define: {
+      GIT_COMMIT_INFO: JSON.stringify(
+        gitCommitHash === undefined
+          ? "unknown"
+          : gitCommitHash + (isDirty ? "-dirty" : ""),
+      ),
+    },
+
     server: {
       port: 4482,
       headers: {

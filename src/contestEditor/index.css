@@ -22,20 +22,28 @@
   min-height: 0;
 }
 
-.config-panel {
-  height: 100%;
-  padding: 16px;
+.contest-editor .editor-body .ant-splitter-panel {
   overflow-y: auto;
 }
 
+.config-panel {
+  padding: 16px;
+}
+
 .preview {
+  width: 100%;
   height: 100%;
-  overflow-y: auto;
+  position: relative;
   background: #f5f5f5;
 }
 
 .preview-container {
+  overflow: auto;
+  height: 100%;
+  transform: translateZ(0);
+}
+
+.preview-container > div {
   padding: 16px;
   background: white;
-  min-height: 100%;
 }

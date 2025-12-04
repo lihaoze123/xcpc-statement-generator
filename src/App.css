@@ -16,7 +16,8 @@
 
 .app > footer {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
   padding: 12px;
   color: #666;
   font-size: 14px;

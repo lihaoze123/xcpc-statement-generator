@@ -1,5 +1,5 @@
 {
-  "name": "xcpc-statement-gen",
+  "name": "xcpc-statement-generator",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fortawesome/free-brands-svg-icons": "^7.1.0",
     "@fortawesome/free-solid-svg-icons": "^7.1.0",
     "@fortawesome/react-fontawesome": "^3.1.0",
     "@mr.python/promise-worker-ts": "^1.0.0",

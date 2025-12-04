@@ -23,14 +23,14 @@ const TypstPreviewContainer = memo<{ svg: string }>(({ svg }) => {
     `;
   }, [svg]);
 
-  return <div className="preview-container" ref={ref} />;
+  return <div ref={ref} />;
 });
 
 const Preview = memo<{ data: Contest }>(({ data }) => {
   const [error, setError] = useState<string>();
   const [svg, setSvg] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const previewContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -58,7 +58,7 @@ const Preview = memo<{ data: Contest }>(({ data }) => {
   }, [data]);
 
   useEffect(() => {
-    const container = containerRef.current;
+    const container = previewContainerRef.current;
     if (!container) return;
 
     let scrollRatio = 0;
@@ -91,14 +91,14 @@ const Preview = memo<{ data: Contest }>(({ data }) => {
   }, []);
 
   return (
-    <div className="preview" ref={containerRef}>
+    <div className="preview">
       {error && (
         <Alert
           message="渲染出错"
           description={error}
           type="error"
           showIcon
-          style={{ margin: 16 }}
+          style={{ margin: 16, position: "absolute", top: 0, left: 0, width: "calc(100% - 32px)", zIndex: 10 }}
         />
       )}
       {loading && !svg && (
@@ -106,7 +106,11 @@ const Preview = memo<{ data: Contest }>(({ data }) => {
           <Spin size="large" tip="正在编译..." />
         </div>
       )}
-      {svg && <TypstPreviewContainer svg={svg} />}
+      {svg && (
+        <div className="preview-container" ref={previewContainerRef}>
+          <TypstPreviewContainer svg={svg} />
+        </div>
+      )}
     </div>
   );
 }, isEqual);
