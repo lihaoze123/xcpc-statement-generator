@@ -2,13 +2,14 @@ import { type FC, useEffect, useState, useMemo, Suspense, use } from "react";
 import { useImmer } from "use-immer";
 import { App, Button, Space, Dropdown, Splitter } from "antd";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFileArrowDown, faFileImport, faFileExport, faChevronDown } from "@fortawesome/free-solid-svg-icons";
+import { faFileArrowDown, faFileImport, faFileExport, faChevronDown, faFolderOpen } from "@fortawesome/free-solid-svg-icons";
 import { debounce } from "lodash";
 
 import type { Contest } from "@/types/contest";
 import { exampleStatements } from "./exampleStatements";
 import { compileToPdf, typstInitPromise } from "@/compiler";
 import { saveConfigToDB, loadConfigFromDB, exportConfig, importConfig, clearDB } from "@/utils/indexedDBUtils";
+import { loadPolygonPackage } from "@/utils/polygonConverter";
 import ConfigPanel from "./ConfigPanel";
 import Preview from "./Preview";
 
@@ -66,6 +67,36 @@ const ContestEditorImpl: FC<{ initialData: Contest }> = ({ initialData }) => {
         await saveConfigToDB(data);
         message.success("配置导入成功");
       } catch (err) {
+        (notification as any).open({
+          type: "error",
+          message: "导入失败",
+          description: err instanceof Error ? err.message : String(err),
+          placement: "bottomRight",
+        });
+      }
+    };
+    input.click();
+  };
+
+  const handleImportPolygonPackage = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".zip";
+    // @ts-ignore - webkitdirectory is not in the type definition
+    input.webkitdirectory = false;
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+
+      const loadingMessage = message.loading("正在解析 Polygon 比赛包...", 0);
+      try {
+        const data = await loadPolygonPackage([file]);
+        updateContestData(() => data);
+        await saveConfigToDB(data);
+        loadingMessage();
+        message.success("Polygon 比赛包导入成功");
+      } catch (err) {
+        loadingMessage();
         (notification as any).open({
           type: "error",
           message: "导入失败",
@@ -138,6 +169,9 @@ const ContestEditorImpl: FC<{ initialData: Contest }> = ({ initialData }) => {
               载入示例 <FontAwesomeIcon icon={faChevronDown} />
             </Button>
           </Dropdown>
+          <Button icon={<FontAwesomeIcon icon={faFolderOpen} />} onClick={handleImportPolygonPackage}>
+            导入 Polygon 比赛包
+          </Button>
           <Button icon={<FontAwesomeIcon icon={faFileImport} />} onClick={handleImport}>
             导入配置
           </Button>

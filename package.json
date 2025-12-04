@@ -1,7 +1,7 @@
 {
   "name": "xcpc-statement-generator",
   "private": true,
-  "version": "0.1.1",
+  "version": "0.1.2",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -19,12 +19,14 @@
     "antd": "^6.0.0",
     "axios": "^1.13.2",
     "fontkit": "^2.0.4",
+    "jszip": "^3.10.1",
     "lodash": "^4.17.21",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "use-immer": "^0.11.0"
   },
   "devDependencies": {
+    "@types/jszip": "^3.4.0",
     "@types/lodash": "^4.17.15",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.5",
