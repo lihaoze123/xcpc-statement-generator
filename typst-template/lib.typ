@@ -8,6 +8,7 @@
   serif: ("New Computer Modern Math", "FZShuSong-Z01"),
   sans: ("CMU Sans Serif", "FZHei-B01"),
   kaishu: ("FZKai-Z03",),
+  songti-bold: ("New Computer Modern Math", "FZXiaoBiaoSong-B05"),
   mono: ("FiraCode Nerd Font",)
 )
 
@@ -79,7 +80,6 @@
   #if problem.samples.len() > 0 [
     == #text(font: fonts.sans, size: 15pt)[样例]
 
-    #show raw: set text(font: fonts.mono)
     #figure(
       table(
         columns: (7.2cm, 7.2cm),
@@ -118,6 +118,9 @@
 ) = {
   set text(lang: "zh", font: fonts.serif)
   set document(title: title, author: author)
+
+  show strong: set text(font: fonts.songti-bold, weight: "bold")
+  show raw: set text(font: fonts.mono)
 
   // 封面页
   if enable-titlepage {
