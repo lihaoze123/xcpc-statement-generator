@@ -41,7 +41,32 @@
   }
 }
 
-#let render-problem(problem, statement) = [
+#let translations = (
+  zh: (
+    input: "输入格式",
+    output: "输出格式",
+    examples: "样例",
+    note: "提示",
+    problem-list: "试题列表",
+    stdin: "标准输入",
+    stdout: "标准输出",
+    problem-set-info: (n, m) => [本试题册共 #n 题，#m 页。],
+    missing-warning: "如果您的试题册缺少页面，请立即通知志愿者。",
+  ),
+  en: (
+    input: "Input",
+    output: "Output",
+    examples: "Examples",
+    note: "Note",
+    problem-list: "Problem List",
+    stdin: "standard input",
+    stdout: "standard output",
+    problem-set-info: (n, m) => [This problem set should contain #n problems on #m numbered pages.],
+    missing-warning: "Please inform a runner immediately if something is missing from your problem set.",
+  )
+)
+
+#let render-problem(problem, statement, language: "zh") = [
   #v(-10pt)
   = #text(font: fonts.sans, size: 20pt)[#problem.display-name]
   #v(10pt)
@@ -55,9 +80,10 @@
   } else {
     eval(statement.description, mode: "markup")
   }
+  #v(0.5em)
 
   #if statement.at("input", default: none) != none and statement.input != "" [
-    == #text(font: fonts.sans, size: 15pt)[输入格式]
+    == #text(font: fonts.sans, size: 15pt)[#translations.at(language).input]
     #if format == "latex" {
       let res = mitex-convert(mode: "text", statement.input)
       eval(res, mode: "markup", scope: mitex-scope)
@@ -67,9 +93,10 @@
       eval(statement.input, mode: "markup")
     }
   ]
+  #v(0.5em)
 
   #if statement.at("output", default: none) != none and statement.output != "" [
-    == #text(font: fonts.sans, size: 15pt)[输出格式]
+    == #text(font: fonts.sans, size: 15pt)[#translations.at(language).output]
     #if format == "latex" {
       let res = mitex-convert(mode: "text", statement.output)
       eval(res, mode: "markup", scope: mitex-scope)
@@ -79,23 +106,25 @@
       eval(statement.output, mode: "markup")
     }
   ]
+  #v(0.5em)
 
   #if problem.samples.len() > 0 [
-    == #text(font: fonts.sans, size: 15pt)[样例]
+    == #text(font: fonts.sans, size: 15pt)[#translations.at(language).examples]
 
     #figure(
       table(
         columns: (7.2cm, 7.2cm),
         align: (x, y) => if y == 0 { center } else { left },
         stroke: 0.4pt,
-        table.header([标准输入], [标准输出]),
+        table.header([#translations.at(language).stdin], [#translations.at(language).stdout]),
         ..problem.samples.map(s => (raw(s.input), raw(s.output))).flatten(),
       ),
     )
   ]
+  #v(0.5em)
 
   #if statement.at("notes", default: none) != none and statement.notes != "" [
-    == #text(font: fonts.sans, size: 15pt)[提示]
+    == #text(font: fonts.sans, size: 15pt)[#translations.at(language).note]
     #if format == "latex" {
       let res = mitex-convert(mode: "text", statement.notes)
       eval(res, mode: "markup", scope: mitex-scope)
@@ -115,6 +144,7 @@
   author: "初梦",
   date: datetime.today().display("[year] 年 [month] 月[day] 日"),
   problems: none,
+  language: "zh",
   enable-titlepage: true,
   enable-header-footer: true,
   enable-problem-list: true,
@@ -139,7 +169,7 @@
       figure(
         placement: bottom,
         [
-          #text(size: 12pt, font: fonts.sans)[试题列表]
+          #text(size: 12pt, font: fonts.sans)[#translations.at(language).problem-list]
 
           #set table(stroke: (x, y) => (
             if y == 0 {
@@ -162,9 +192,9 @@
 
           #v(0.8cm)
 
-          本试题册共 #problems.len() 题，#context counter(page).final().at(0) 页。
+          #context (translations.at(language).problem-set-info)(problems.len(), counter(page).final().at(0))
 
-          如果您的试题册缺少页面，请立即通知志愿者。
+          #translations.at(language).missing-warning
         ],
       )
     }
@@ -172,7 +202,7 @@
 
   // 题面
   {
-    set par(first-line-indent: (amount: 2em, all: true), justify: true, spacing: 0.65em)
+    set par(justify: true, spacing: 0.65em)
     show heading: set block(above: 0.6em)
     show heading: set text(font: fonts.sans)
 
@@ -208,7 +238,7 @@
     if problems != none {
       for (i, e) in problems.enumerate() {
         e.problem.display-name = "Problem " + str.from-unicode(int(i) + 65) + ". " + e.problem.display_name
-        render-problem(e.problem, e.statement)
+        render-problem(e.problem, e.statement, language: language)
 
         if i < problems.len() - 1 {
           pagebreak()

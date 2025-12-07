@@ -247,6 +247,7 @@ export class PolygonContestConverter {
       subtitle: `Contest ID: ${contestId}`,
       author: 'Polygon Package',
       date: currentDate,
+      language: 'zh',
       enable_titlepage: true,
       enable_header_footer: true,
       enable_problem_list: true,

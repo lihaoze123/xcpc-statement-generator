@@ -7,6 +7,7 @@ export const exampleStatements: Record<string, Contest> = {
       subtitle: "试题册",
       author: "初梦",
       date: "2025 年 12 月 4 日",
+      language: "zh",
       enable_titlepage: true,
       enable_header_footer: true,
       enable_problem_list: true,

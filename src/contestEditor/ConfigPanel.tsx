@@ -124,6 +124,13 @@ const ConfigPanel: FC<ConfigPanelProps> = ({ contestData, updateContestData }) =
             />
             <span style={{ marginLeft: 8 }}>显示试题列表</span>
           </Form.Item>
+          <Form.Item>
+            <Switch
+              checked={contestData.meta.language === "en"}
+              onChange={(checked) => updateContestData((d) => { d.meta.language = checked ? "en" : "zh"; })}
+            />
+            <span style={{ marginLeft: 8 }}>英文模式（默认中文）</span>
+          </Form.Item>
         </Form>
       </Card>
 

@@ -132,6 +132,7 @@ function buildTypstDocument(contest: ContestWithImages): string {
     subtitle: contest.meta.subtitle,
     author: contest.meta.author,
     date: contest.meta.date,
+    language: contest.meta.language,
     problems: contest.problems.map((p) => ({
       problem: {
         display_name: p.problem.display_name,
@@ -157,6 +158,7 @@ function buildTypstDocument(contest: ContestWithImages): string {
   subtitle: "${escapeTypstString(data.subtitle)}",
   author: "${escapeTypstString(data.author)}",
   date: "${escapeTypstString(data.date)}",
+  language: "${data.language}",
   problems: (${data.problems.map((p) => `(
     problem: (
       display_name: "${escapeTypstString(p.problem.display_name)}",

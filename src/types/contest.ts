@@ -38,6 +38,7 @@ export interface ContestMetadata {
   subtitle: string;
   author: string;
   date: string;
+  language: "zh" | "en";
   enable_titlepage: boolean;
   enable_header_footer: boolean;
   enable_problem_list: boolean;
