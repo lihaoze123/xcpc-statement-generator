@@ -5,24 +5,24 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFileArrowDown, faFileImport, faFileExport, faChevronDown, faFolderOpen } from "@fortawesome/free-solid-svg-icons";
 import { debounce } from "lodash";
 
-import type { Contest } from "@/types/contest";
+import type { ContestWithImages, ImageData } from "@/types/contest";
 import { exampleStatements } from "./exampleStatements";
-import { compileToPdf, typstInitPromise } from "@/compiler";
-import { saveConfigToDB, loadConfigFromDB, exportConfig, importConfig, clearDB } from "@/utils/indexedDBUtils";
+import { compileToPdf, typstInitPromise, registerImages } from "@/compiler";
+import { saveConfigToDB, loadConfigFromDB, exportConfig, importConfig, clearDB, saveImageToDB } from "@/utils/indexedDBUtils";
 import { loadPolygonPackage } from "@/utils/polygonConverter";
 import ConfigPanel from "./ConfigPanel";
 import Preview from "./Preview";
 
 import "./index.css";
 
-const ContestEditorImpl: FC<{ initialData: Contest }> = ({ initialData }) => {
-  const [contestData, updateContestData] = useImmer<Contest>(initialData);
+const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData }) => {
+  const [contestData, updateContestData] = useImmer<ContestWithImages>(initialData);
   const [exportDisabled, setExportDisabled] = useState(true);
   const { modal, notification, message } = App.useApp();
 
   // Debounced auto-save
   const debouncedSave = useMemo(() =>
-    debounce(async (data: Contest) => {
+    debounce(async (data: ContestWithImages) => {
       try { await saveConfigToDB(data); }
       catch (e) { console.error("Auto-save failed:", e); }
     }, 500),
@@ -30,6 +30,13 @@ const ContestEditorImpl: FC<{ initialData: Contest }> = ({ initialData }) => {
   );
 
   useEffect(() => { debouncedSave(contestData); }, [contestData, debouncedSave]);
+
+  // Register images with compiler when images change
+  useEffect(() => {
+    registerImages(contestData.images).catch((e) =>
+      console.error("Failed to register images:", e)
+    );
+  }, [contestData.images]);
 
   // Enable export after Typst init
   useEffect(() => {
@@ -47,9 +54,15 @@ const ContestEditorImpl: FC<{ initialData: Contest }> = ({ initialData }) => {
     });
     if (!confirmed) return;
 
-    updateContestData(() => exampleStatements[key]);
+    // Revoke old blob URLs
+    for (const img of contestData.images) {
+      URL.revokeObjectURL(img.url);
+    }
+
+    const exampleData: ContestWithImages = { ...exampleStatements[key], images: [] };
+    updateContestData(() => exampleData);
     await clearDB();
-    await saveConfigToDB(exampleStatements[key]);
+    await saveConfigToDB(exampleData);
     message.success("示例配置已载入");
   };
 
@@ -62,9 +75,32 @@ const ContestEditorImpl: FC<{ initialData: Contest }> = ({ initialData }) => {
       if (!file) return;
       try {
         const text = await file.text();
-        const data = importConfig(text);
-        updateContestData(() => data);
-        await saveConfigToDB(data);
+        const { data, images } = importConfig(text);
+
+        // Revoke old blob URLs
+        for (const img of contestData.images) {
+          URL.revokeObjectURL(img.url);
+        }
+
+        // Create blob URLs for imported images and save to DB
+        const imageList: ImageData[] = [];
+        for (const imgMeta of data.images || []) {
+          const blob = images.get(imgMeta.uuid);
+          if (blob) {
+            const url = URL.createObjectURL(blob);
+            imageList.push({ uuid: imgMeta.uuid, name: imgMeta.name, url });
+            await saveImageToDB(imgMeta.uuid, blob);
+          }
+        }
+
+        const contestWithImages: ContestWithImages = {
+          meta: data.meta,
+          problems: data.problems,
+          images: imageList,
+        };
+
+        updateContestData(() => contestWithImages);
+        await saveConfigToDB(contestWithImages);
         message.success("配置导入成功");
       } catch (err) {
         (notification as any).open({
@@ -90,9 +126,15 @@ const ContestEditorImpl: FC<{ initialData: Contest }> = ({ initialData }) => {
 
       const loadingMessage = message.loading("正在解析 Polygon 比赛包...", 0);
       try {
+        // Revoke old blob URLs
+        for (const img of contestData.images) {
+          URL.revokeObjectURL(img.url);
+        }
+
         const data = await loadPolygonPackage([file]);
-        updateContestData(() => data);
-        await saveConfigToDB(data);
+        const contestWithImages: ContestWithImages = { ...data, images: [] };
+        updateContestData(() => contestWithImages);
+        await saveConfigToDB(contestWithImages);
         loadingMessage();
         message.success("Polygon 比赛包导入成功");
       } catch (err) {
@@ -108,9 +150,9 @@ const ContestEditorImpl: FC<{ initialData: Contest }> = ({ initialData }) => {
     input.click();
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
     try {
-      const json = exportConfig(contestData);
+      const json = await exportConfig(contestData);
       const blob = new Blob([json], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -201,7 +243,7 @@ const ContestEditorImpl: FC<{ initialData: Contest }> = ({ initialData }) => {
   );
 };
 
-const ContestEditorWithPromise: FC<{ promise: Promise<Contest> }> = ({ promise }) => {
+const ContestEditorWithPromise: FC<{ promise: Promise<ContestWithImages> }> = ({ promise }) => {
   const initialData = use(promise);
   return <ContestEditorImpl initialData={initialData} />;
 };
@@ -209,8 +251,28 @@ const ContestEditorWithPromise: FC<{ promise: Promise<Contest> }> = ({ promise }
 const ContestEditor: FC = () => {
   const initialPromise = useMemo(() =>
     loadConfigFromDB()
-      .then((data) => data || exampleStatements.SupportedGrammar)
-      .catch(() => exampleStatements.SupportedGrammar),
+      .then((stored) => {
+        if (!stored) {
+          return { ...exampleStatements.SupportedGrammar, images: [] } as ContestWithImages;
+        }
+
+        // Create blob URLs for loaded images
+        const imageList: ImageData[] = [];
+        for (const imgMeta of stored.data.images || []) {
+          const blob = stored.images.get(imgMeta.uuid);
+          if (blob) {
+            const url = URL.createObjectURL(blob);
+            imageList.push({ uuid: imgMeta.uuid, name: imgMeta.name, url });
+          }
+        }
+
+        return {
+          meta: stored.data.meta,
+          problems: stored.data.problems,
+          images: imageList,
+        } as ContestWithImages;
+      })
+      .catch(() => ({ ...exampleStatements.SupportedGrammar, images: [] } as ContestWithImages)),
     []
   );
 

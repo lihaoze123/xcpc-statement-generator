@@ -1,11 +1,14 @@
 import axios from "axios";
-import type { Contest } from "../types/contest";
+import type { ContestWithImages, ImageData } from "../types/contest";
 import fontUrlEntries from "virtual:typst-font-url-entries";
 import TypstCompilerWasmUrl from "@myriaddreamin/typst-ts-web-compiler/pkg/typst_ts_web_compiler_bg.wasm?url";
 import TypstRendererWasmUrl from "@myriaddreamin/typst-ts-renderer/pkg/typst_ts_renderer_bg.wasm?url";
 import TypstWorker from "./compiler.worker?worker";
 
 const worker = new TypstWorker();
+
+// Store images for compilation
+let imageDataMap: Map<string, ArrayBuffer> = new Map();
 
 const browserCache: Cache | undefined = await window.caches?.open("typst-assets");
 
@@ -187,7 +190,7 @@ export const typstInitPromise = Promise.all(
   throw new Error("Typst initialization failed", { cause: err });
 });
 
-function sendMessage<T>(type: string, data: any): Promise<T> {
+function sendMessage<T>(type: string, data: any, transfer?: Transferable[]): Promise<T> {
   return new Promise((resolve, reject) => {
     const id = crypto.randomUUID();
     const timeout = setTimeout(() => reject(new Error("Timeout")), 60000);
@@ -201,19 +204,50 @@ function sendMessage<T>(type: string, data: any): Promise<T> {
     };
 
     worker.addEventListener('message', handler);
-    worker.postMessage({ id, type, data });
+    if (transfer) {
+      worker.postMessage({ id, type, data }, transfer);
+    } else {
+      worker.postMessage({ id, type, data });
+    }
   });
 }
 
-export const compileToPdf = (data: Contest): Promise<Uint8Array> =>
+// Register images for compilation (call before compile)
+export const registerImages = async (images: ImageData[]): Promise<void> => {
+  imageDataMap.clear();
+
+  // Fetch all blob URLs to get ArrayBuffers
+  const imageBuffers: { uuid: string; buffer: ArrayBuffer }[] = [];
+  for (const img of images) {
+    try {
+      const response = await fetch(img.url);
+      const buffer = await response.arrayBuffer();
+      imageBuffers.push({ uuid: img.uuid, buffer });
+      imageDataMap.set(img.uuid, buffer);
+    } catch (e) {
+      console.error(`Failed to load image ${img.uuid}:`, e);
+    }
+  }
+
+  // Send images to worker
+  if (imageBuffers.length > 0) {
+    const imagesObj: Record<string, ArrayBuffer> = {};
+    for (const { uuid, buffer } of imageBuffers) {
+      imagesObj[uuid] = buffer;
+    }
+    await sendMessage("registerImages", { images: imagesObj });
+  }
+};
+
+export const compileToPdf = (data: ContestWithImages): Promise<Uint8Array> =>
   sendMessage("compileTypst", data);
 
-export const compileToSvg = (data: Contest): Promise<string> =>
+export const compileToSvg = (data: ContestWithImages): Promise<string> =>
   sendMessage("renderTypst", data);
 
 export const compileToSvgDebounced = (() => {
   type Task = {
-    args: Contest;
+    args: ContestWithImages;
     resolve: (v: string | undefined) => void;
     reject: (e: unknown) => void;
   };
@@ -235,7 +269,7 @@ export const compileToSvgDebounced = (() => {
       });
   };
 
-  return (args: Contest): Promise<string | undefined> => {
+  return (args: ContestWithImages): Promise<string | undefined> => {
     return new Promise((resolve, reject) => {
       if (waitingTask) waitingTask.reject("Aborted");
       waitingTask = { args, resolve, reject };

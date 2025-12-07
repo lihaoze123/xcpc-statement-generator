@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState } from "react";
-import type { Contest } from "@/types/contest";
+import type { ContestWithImages } from "@/types/contest";
 import { compileToSvgDebounced, typstInitPromise } from "@/compiler";
 import { Alert, Spin } from "antd";
 import { isEqual } from "lodash";
@@ -26,7 +26,7 @@ const TypstPreviewContainer = memo<{ svg: string }>(({ svg }) => {
   return <div ref={ref} />;
 });
 
-const Preview = memo<{ data: Contest }>(({ data }) => {
+const Preview = memo<{ data: ContestWithImages }>(({ data }) => {
   const [error, setError] = useState<string>();
   const [svg, setSvg] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);

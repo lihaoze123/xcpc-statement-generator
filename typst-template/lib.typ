@@ -2,7 +2,7 @@
 #import "@preview/cmarker:0.1.6": render as cmarker-render
 #import "@preview/mitex:0.2.6": *
 
-#let md = cmarker-render.with(math: mitex)
+#let md = cmarker-render.with(math: mitex, scope: (image: (source, alt: none, format: auto) => image(source, alt: alt, format: format)))
 
 #let fonts = (
   serif: ("New Computer Modern Math", "FZShuSong-Z01"),
@@ -48,7 +48,8 @@
 
   #let format = problem.at("format", default: "latex")
   #if format == "latex" {
-    mitext(statement.description)
+    let res = mitex-convert(mode: "text", statement.description)
+    eval(res, mode: "markup", scope: mitex-scope)
   } else if format == "markdown" {
     md(statement.description)
   } else {
@@ -58,7 +59,8 @@
   #if statement.at("input", default: none) != none and statement.input != "" [
     == #text(font: fonts.sans, size: 15pt)[输入格式]
     #if format == "latex" {
-      mitext(statement.input)
+      let res = mitex-convert(mode: "text", statement.input)
+      eval(res, mode: "markup", scope: mitex-scope)
     } else if format == "markdown" {
       md(statement.input)
     } else {
@@ -69,7 +71,8 @@
   #if statement.at("output", default: none) != none and statement.output != "" [
     == #text(font: fonts.sans, size: 15pt)[输出格式]
     #if format == "latex" {
-      mitext(statement.output)
+      let res = mitex-convert(mode: "text", statement.output)
+      eval(res, mode: "markup", scope: mitex-scope)
     } else if format == "markdown" {
       md(statement.output)
     } else {
@@ -94,7 +97,8 @@
   #if statement.at("notes", default: none) != none and statement.notes != "" [
     == #text(font: fonts.sans, size: 15pt)[提示]
     #if format == "latex" {
-      mitext(statement.notes)
+      let res = mitex-convert(mode: "text", statement.notes)
+      eval(res, mode: "markup", scope: mitex-scope)
     } else if format == "markdown" {
       md(statement.notes)
     } else {

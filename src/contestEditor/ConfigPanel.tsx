@@ -1,15 +1,76 @@
 import { type FC } from "react";
-import { Card, Form, Input, Button, Space, Switch, Select } from "antd";
+import { Card, Form, Input, Button, Space, Switch, Select, Upload, App, Tooltip, Typography, Dropdown } from "antd";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlus, faTrash } from "@fortawesome/free-solid-svg-icons";
-import type { Contest, ProblemFormat } from "@/types/contest";
+import { faPlus, faTrash, faInbox, faCopy, faChevronDown } from "@fortawesome/free-solid-svg-icons";
+import type { ContestWithImages, ProblemFormat, ImageData } from "@/types/contest";
+import { saveImageToDB, deleteImageFromDB } from "@/utils/indexedDBUtils";
 
 interface ConfigPanelProps {
-  contestData: Contest;
-  updateContestData: (update: (draft: Contest) => void) => void;
+  contestData: ContestWithImages;
+  updateContestData: (update: (draft: ContestWithImages) => void) => void;
 }
 
 const ConfigPanel: FC<ConfigPanelProps> = ({ contestData, updateContestData }) => {
+  const { message } = App.useApp();
+
+  // Add image handler
+  const handleAddImage = async (file: File) => {
+    const uuid = crypto.randomUUID();
+    const blob = new Blob([file], { type: file.type });
+    const url = URL.createObjectURL(blob);
+
+    // Save to IndexedDB
+    await saveImageToDB(uuid, blob);
+
+    // Add to state
+    updateContestData((draft) => {
+      draft.images.push({
+        uuid,
+        name: file.name,
+        url,
+      });
+    });
+
+    message.success(`图片 "${file.name}" 上传成功`);
+  };
+
+  // Delete image handler
+  const handleDeleteImage = async (index: number) => {
+    const img = contestData.images[index];
+    if (!img) return;
+
+    // Revoke blob URL
+    URL.revokeObjectURL(img.url);
+
+    // Delete from IndexedDB
+    await deleteImageFromDB(img.uuid);
+
+    // Remove from state
+    updateContestData((draft) => {
+      draft.images.splice(index, 1);
+    });
+
+    message.success("图片已删除");
+  };
+
+  // Copy image reference to clipboard
+  const handleCopyImageRef = (img: ImageData, format: "typst" | "latex" | "markdown") => {
+    let ref: string;
+    switch (format) {
+      case "typst":
+        ref = `#image("/asset/${img.uuid}")`;
+        break;
+      case "latex":
+        ref = `\\includegraphics{/asset/${img.uuid}}`;
+        break;
+      case "markdown":
+        ref = `![${img.name}](/asset/${img.uuid})`;
+        break;
+    }
+    navigator.clipboard.writeText(ref);
+    message.success("图片引用已复制到剪贴板");
+  };
+
   return (
     <div className="config-panel">
       <Card title="比赛配置" size="small" style={{ marginBottom: 16 }}>
@@ -64,6 +125,91 @@ const ConfigPanel: FC<ConfigPanelProps> = ({ contestData, updateContestData }) =
             <span style={{ marginLeft: 8 }}>显示试题列表</span>
           </Form.Item>
         </Form>
+      </Card>
+
+      <Card title="图片管理" size="small" style={{ marginBottom: 16 }}>
+        <div className="image-upload-section">
+          <Upload.Dragger
+            name="add-image"
+            beforeUpload={async (file) => {
+              if (
+                !["image/png", "image/jpeg", "image/gif", "image/svg+xml"].includes(file.type)
+              ) {
+                message.error("不支持该图片类型，仅支持 PNG/JPEG/GIF/SVG");
+                return Upload.LIST_IGNORE;
+              }
+              // Handle file directly here and prevent default upload
+              try {
+                await handleAddImage(file);
+              } catch (err) {
+                console.error("Failed to add image:", err);
+                message.error("图片上传失败");
+              }
+              return false; // Prevent default upload behavior
+            }}
+            showUploadList={false}
+            accept=".png,.jpg,.jpeg,.gif,.svg,image/png,image/jpeg,image/gif,image/svg+xml"
+            multiple
+          >
+            <div className="upload-dragger-content">
+              <FontAwesomeIcon icon={faInbox} size="2x" style={{ color: "#999" }} />
+              <div style={{ marginTop: 8 }}>点击或拖拽上传图片</div>
+              <div style={{ fontSize: 12, color: "#999" }}>支持 PNG/JPEG/GIF/SVG 格式</div>
+            </div>
+          </Upload.Dragger>
+
+          {contestData.images.length > 0 && (
+            <div className="image-list">
+              {contestData.images.map((img, index) => (
+                <div key={img.uuid} className="image-item">
+                  <div className="image-thumbnail-container">
+                    <img src={img.url} alt={img.name} className="image-thumbnail" />
+                  </div>
+                  <div className="image-info">
+                    <Typography.Text ellipsis style={{ maxWidth: 120 }} title={img.name}>
+                      {img.name}
+                    </Typography.Text>
+                    <div className="image-actions">
+                      <Dropdown
+                        menu={{
+                          items: [
+                            { key: "typst", label: "Typst" },
+                            { key: "latex", label: "LaTeX" },
+                            { key: "markdown", label: "Markdown" },
+                          ],
+                          onClick: ({ key }) => handleCopyImageRef(img, key as "typst" | "latex" | "markdown"),
+                        }}
+                        trigger={["click"]}
+                      >
+                        <Tooltip title="复制引用代码">
+                          <Button type="text" size="small">
+                            <FontAwesomeIcon icon={faCopy} />
+                            <FontAwesomeIcon icon={faChevronDown} style={{ marginLeft: 4, fontSize: 10 }} />
+                          </Button>
+                        </Tooltip>
+                      </Dropdown>
+                      <Tooltip title="删除图片">
+                        <Button
+                          type="text"
+                          size="small"
+                          danger
+                          icon={<FontAwesomeIcon icon={faTrash} />}
+                          onClick={() => handleDeleteImage(index)}
+                        />
+                      </Tooltip>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {contestData.images.length > 0 && (
+            <div style={{ marginTop: 8, fontSize: 12, color: "#666" }}>
+              点击复制按钮选择格式（Typst / LaTeX / Markdown）获取引用代码
+            </div>
+          )}
+        </div>
       </Card>
 
       <Card title="题目列表" size="small">

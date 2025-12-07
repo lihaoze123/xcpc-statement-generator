@@ -1,4 +1,4 @@
-import type { Contest } from "../types/contest";
+import type { ContestWithImages } from "../types/contest";
 import {
   $typst,
   createTypstCompiler,
@@ -28,6 +28,9 @@ const RequiredPackages = [
 let isInitialized = false;
 let initPromise: Promise<void> | null = null;
 let preloadedPackages: Map<string, ArrayBuffer>;
+
+// Store registered images (uuid -> ArrayBuffer)
+let registeredImages: Map<string, ArrayBuffer> = new Map();
 
 const typstAccessModel = new MemoryAccessModel();
 
@@ -111,7 +114,19 @@ function escapeTypstString(str: string): string {
     .replace(/\r/g, '\\r');
 }
 
-function buildTypstDocument(contest: Contest): string {
+// Add images to virtual filesystem using mapShadow
+async function addImagesToFilesystem(contest: ContestWithImages): Promise<void> {
+  for (const img of contest.images) {
+    const buffer = registeredImages.get(img.uuid);
+    if (buffer) {
+      // Add image to virtual filesystem at /asset/{uuid}
+      // Using mapShadow to map the path to binary content
+      $typst.mapShadow(`/asset/${img.uuid}`, new Uint8Array(buffer));
+    }
+  }
+}
+
+function buildTypstDocument(contest: ContestWithImages): string {
   const data = {
     title: contest.meta.title,
     subtitle: contest.meta.subtitle,
@@ -161,8 +176,11 @@ function buildTypstDocument(contest: Contest): string {
 )`;
 }
 
-async function compileToPdf(contest: Contest): Promise<Uint8Array> {
+async function compileToPdf(contest: ContestWithImages): Promise<Uint8Array> {
   if (!isInitialized) throw new Error("Typst compiler not initialized");
+
+  // Add images to virtual filesystem
+  await addImagesToFilesystem(contest);
 
   const doc = buildTypstDocument(contest);
   $typst.addSource("/main.typ", doc);
@@ -172,8 +190,11 @@ async function compileToPdf(contest: Contest): Promise<Uint8Array> {
   return pdf;
 }
 
-async function renderToSvg(contest: Contest): Promise<string> {
+async function renderToSvg(contest: ContestWithImages): Promise<string> {
   if (!isInitialized) throw new Error("Typst compiler not initialized");
+
+  // Add images to virtual filesystem
+  await addImagesToFilesystem(contest);
 
   const doc = buildTypstDocument(contest);
   $typst.addSource("/main.typ", doc);
@@ -194,13 +215,24 @@ self.addEventListener('message', async (event) => {
         self.postMessage({ id, success: true });
         break;
 
+      case "registerImages":
+        // Register images for compilation
+        registeredImages.clear();
+        if (data.images) {
+          for (const [uuid, buffer] of Object.entries(data.images)) {
+            registeredImages.set(uuid, buffer as ArrayBuffer);
+          }
+        }
+        self.postMessage({ id, success: true });
+        break;
+
       case "compileTypst":
-        const pdf = await compileToPdf(data as Contest);
+        const pdf = await compileToPdf(data as ContestWithImages);
         self.postMessage({ id, success: true, data: pdf });
         break;
 
       case "renderTypst":
-        const svg = await renderToSvg(data as Contest);
+        const svg = await renderToSvg(data as ContestWithImages);
         self.postMessage({ id, success: true, data: svg });
         break;
 

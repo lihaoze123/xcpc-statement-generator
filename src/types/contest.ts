@@ -43,8 +43,27 @@ export interface ContestMetadata {
   enable_problem_list: boolean;
 }
 
-// 完整的比赛配置
+// 图片元数据（用于存储）
+export interface ImageMeta {
+  uuid: string;
+  name: string;
+}
+
+// 图片数据（包含 URL，用于运行时）
+export interface ImageData extends ImageMeta {
+  url: string; // Blob URL for display
+}
+
+// 完整的比赛配置（存储格式，不含 Blob URL）
 export interface Contest {
   meta: ContestMetadata;
   problems: Problem[];
+  images?: ImageMeta[];
+}
+
+// 比赛配置（运行时格式，包含 Blob URL）
+export interface ContestWithImages {
+  meta: ContestMetadata;
+  problems: Problem[];
+  images: ImageData[];
 }
