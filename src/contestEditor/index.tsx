@@ -255,7 +255,7 @@ const ContestEditor: FC = () => {
     loadConfigFromDB()
       .then((stored) => {
         if (!stored) {
-          return { ...exampleStatements.SupportedGrammar, images: [] } as ContestWithImages;
+          return { ...exampleStatements["English Example"], images: [] } as ContestWithImages;
         }
 
         // Create blob URLs for loaded images
@@ -274,7 +274,7 @@ const ContestEditor: FC = () => {
           images: imageList,
         } as ContestWithImages;
       })
-      .catch(() => ({ ...exampleStatements.SupportedGrammar, images: [] } as ContestWithImages)),
+      .catch(() => ({ ...exampleStatements["English Example"], images: [] } as ContestWithImages)),
     []
   );
 
