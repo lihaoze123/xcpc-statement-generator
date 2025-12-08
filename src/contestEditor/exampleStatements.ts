@@ -23,7 +23,7 @@ export const exampleStatements: Record<string, Contest> = {
           format: "latex"
         },
         statement: {
-          description: "给定一个字符串 $S$，输出 “Hello, $S$!”",
+          description: "\\begin{tabular}{ll}\n    Input file: & standard input \\\\\n    Output file: & standard output \\\\\n    Time Limit: & 1 second \\\\\n    Memory Limit: & 512 megabytes \\\\\n\\end{tabular}\n\n给定一个字符串 $S$，输出 “Hello, $S$!”",
           input: "输入一个字符串 $S$。",
           output: "输出答案。",
           notes: "字符串长度不超过 100。",
