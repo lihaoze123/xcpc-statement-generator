@@ -34,5 +34,7 @@
   "deleteProblem": "Delete Problem",
   "addProblem": "Add Problem",
   "inputPlaceholder": "Enter {{field}}",
-  "problemPlaceholder": "Problem {{number}}"
+  "problemPlaceholder": "Problem {{number}}",
+  "expand": "Expand",
+  "collapse": "Collapse"
 }

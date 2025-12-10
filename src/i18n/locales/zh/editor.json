@@ -34,5 +34,7 @@
   "deleteProblem": "删除题目",
   "addProblem": "添加题目",
   "inputPlaceholder": "输入{{field}}",
-  "problemPlaceholder": "题目 {{number}}"
+  "problemPlaceholder": "题目 {{number}}",
+  "expand": "展开",
+  "collapse": "收起"
 }

@@ -1,7 +1,7 @@
-import { type FC } from "react";
+import { type FC, useState } from "react";
 import { Card, Form, Input, Button, Space, Switch, Select, Upload, App, Tooltip, Typography, Dropdown } from "antd";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlus, faTrash, faInbox, faCopy, faChevronDown } from "@fortawesome/free-solid-svg-icons";
+import { faPlus, faTrash, faInbox, faCopy, faChevronDown, faChevronUp } from "@fortawesome/free-solid-svg-icons";
 import Editor from "@monaco-editor/react";
 import { useTranslation } from "react-i18next";
 import type { ContestWithImages, ProblemFormat, ImageData, AutoLanguageOption } from "@/types/contest";
@@ -15,6 +15,24 @@ interface ConfigPanelProps {
 const ConfigPanel: FC<ConfigPanelProps> = ({ contestData, updateContestData }) => {
   const { message } = App.useApp();
   const { t } = useTranslation();
+
+  // State to track which problems are expanded (default: all collapsed)
+  const [expandedProblems, setExpandedProblems] = useState<Set<number>>(
+    new Set()
+  );
+
+  // Toggle problem expansion
+  const toggleProblemExpansion = (index: number) => {
+    setExpandedProblems((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(index)) {
+        newSet.delete(index);
+      } else {
+        newSet.add(index);
+      }
+      return newSet;
+    });
+  };
 
   // Add image handler
   const handleAddImage = async (file: File) => {
@@ -250,16 +268,43 @@ const ConfigPanel: FC<ConfigPanelProps> = ({ contestData, updateContestData }) =
 
       <Card title={t('editor:problemList')} size="small">
         <Space direction="vertical" style={{ width: "100%" }} size="small">
-          {contestData.problems.map((problem, index) => (
-            <Card key={index} size="small" style={{ marginBottom: 8 }}>
+          {contestData.problems.map((problem, index) => {
+            const isExpanded = expandedProblems.has(index);
+            return (
+              <Card
+                key={index}
+                size="small"
+                style={{ marginBottom: 8 }}
+                title={
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <span style={{ fontSize: 14 }}>
+                      {String.fromCharCode(65 + index)}. {problem.problem.display_name || t('editor:problemPlaceholder', { number: index + 1 })}
+                    <Button
+                    type="text"
+                    size="small"
+                    danger
+                    icon={<FontAwesomeIcon icon={faTrash} />}
+                    onClick={() => updateContestData((d) => { d.problems.splice(index, 1); })}
+                    >
+                    {t('editor:deleteProblem')}
+                    </Button>
+                    </span>
+                    <Tooltip title={isExpanded ? t('editor:collapse') : t('editor:expand')}>
+                      <Button
+                        type="text"
+                        size="small"
+                        icon={<FontAwesomeIcon icon={isExpanded ? faChevronUp : faChevronDown} />}
+                        onClick={() => toggleProblemExpansion(index)}
+                      />
+                    </Tooltip>
+                  </div>
+                }
+              >
+              {isExpanded &&
               <Space direction="vertical" style={{ width: "100%" }} size="small">
-                <Input
-                  size="small"
-                  placeholder={t('editor:problemName', { number: index + 1 })}
-                  value={problem.problem.display_name}
-                  onChange={(e) => updateContestData((d) => { d.problems[index].problem.display_name = e.target.value; })}
-                />
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                {/* Expanded content */}
+                
+                  <>
                   <span style={{ fontSize: 12, color: "#666", whiteSpace: "nowrap" }}>{t('editor:format')}</span>
                   <Select<ProblemFormat>
                     size="small"
@@ -272,7 +317,12 @@ const ConfigPanel: FC<ConfigPanelProps> = ({ contestData, updateContestData }) =
                     ]}
                     style={{ flex: 1 }}
                   />
-                </div>
+                <Input
+                  size="small"
+                  placeholder={t('editor:problemName', { number: index + 1 })}
+                  value={problem.problem.display_name}
+                  onChange={(e) => updateContestData((d) => { d.problems[index].problem.display_name = e.target.value; })}
+                />
                 <div>
                   <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>{t('editor:problemDescription')}</div>
                   <Editor
@@ -406,18 +456,13 @@ const ConfigPanel: FC<ConfigPanelProps> = ({ contestData, updateContestData }) =
                 >
                   {t('editor:addSample')}
                 </Button>
-                <Button
-                  type="text"
-                  size="small"
-                  danger
-                  icon={<FontAwesomeIcon icon={faTrash} />}
-                  onClick={() => updateContestData((d) => { d.problems.splice(index, 1); })}
-                >
-                  {t('editor:deleteProblem')}
-                </Button>
+                  </>
+                
               </Space>
+              }
             </Card>
-          ))}
+            );
+          })}
 
           <Button
             type="dashed"
