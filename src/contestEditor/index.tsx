@@ -115,6 +115,9 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
           images: imageList,
         };
 
+        // Register images with compiler first to avoid race condition
+        await registerImages(imageList);
+
         updateContestData(() => contestWithImages);
         await saveConfigToDB(contestWithImages);
         message.success(t('messages:configImportSuccess'));
@@ -277,7 +280,7 @@ const ContestEditorWithPromise: FC<{ promise: Promise<ContestWithImages> }> = ({
 const ContestEditor: FC = () => {
   const initialPromise = useMemo(() =>
     loadConfigFromDB()
-      .then((stored) => {
+      .then(async (stored) => {
         if (!stored) {
           const problemsWithKeys = exampleStatements["English Example"].problems.map((problem) => ({
             ...problem,
@@ -305,11 +308,16 @@ const ContestEditor: FC = () => {
           key: problem.key || crypto.randomUUID(),
         }));
 
-        return {
+        const contestWithImages = {
           meta: stored.data.meta,
           problems: problemsWithKeys,
           images: imageList,
         } as ContestWithImages;
+
+        // Register images with compiler first to avoid race condition
+        await registerImages(imageList);
+
+        return contestWithImages;
       })
       .catch(() => {
         const problemsWithKeys = exampleStatements["English Example"].problems.map((problem) => ({
