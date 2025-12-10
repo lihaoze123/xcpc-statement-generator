@@ -145,11 +145,15 @@
   date: datetime.today().display("[year] 年 [month] 月[day] 日"),
   problems: none,
   language: "zh",
+  titlepage-language: auto,
+  problem-language: auto,
   enable-titlepage: true,
   enable-header-footer: true,
   enable-problem-list: true,
   doc,
 ) = {
+  let titlepage-lang = if titlepage-language == auto { language } else { titlepage-language }
+  let problem-lang = if problem-language == auto { language } else { problem-language }
   set text(lang: "zh", font: fonts.serif)
   set document(title: title, author: author)
 
@@ -169,11 +173,15 @@
       figure(
         placement: bottom,
         [
-          #text(size: 12pt, font: fonts.sans)[#translations.at(language).problem-list]
+          #text(size: 12pt, font: fonts.sans)[#translations.at(titlepage-lang).problem-list]
 
           #set table(stroke: (x, y) => (
             if y == 0 {
-              (top: 0.4pt, left: 0.4pt, right: 0.4pt)
+              if problems.len() == 1 {
+                (top: 0.4pt, bottom: 0.4pt, left: 0.4pt, right: 0.4pt)
+              } else {
+                (top: 0.4pt, left: 0.4pt, right: 0.4pt)
+              }
             } else if y == problems.len() - 1 {
               (bottom: 0.4pt, left: 0.4pt, right: 0.4pt)
             } else {
@@ -192,9 +200,9 @@
 
           #v(0.8cm)
 
-          #context (translations.at(language).problem-set-info)(problems.len(), counter(page).final().at(0))
+          #context (translations.at(titlepage-lang).problem-set-info)(problems.len(), counter(page).final().at(0))
 
-          #translations.at(language).missing-warning
+          #translations.at(titlepage-lang).missing-warning
         ],
       )
     }
@@ -238,7 +246,7 @@
     if problems != none {
       for (i, e) in problems.enumerate() {
         e.problem.display-name = "Problem " + str.from-unicode(int(i) + 65) + ". " + e.problem.display_name
-        render-problem(e.problem, e.statement, language: language)
+        render-problem(e.problem, e.statement, language: problem-lang)
 
         if i < problems.len() - 1 {
           pagebreak()

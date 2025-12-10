@@ -148,7 +148,9 @@ function buildTypstDocument(contest: ContestWithImages): string {
     })),
     enableTitlepage: contest.meta.enable_titlepage,
     enableHeaderFooter: contest.meta.enable_header_footer,
-    enableProblemList: contest.meta.enable_problem_list
+    enableProblemList: contest.meta.enable_problem_list,
+    titlepageLanguage: contest.meta.titlepage_language || "auto",
+    problemLanguage: contest.meta.problem_language || "auto"
   };
 
   return `#import "/lib.typ": contest-conf
@@ -174,7 +176,9 @@ function buildTypstDocument(contest: ContestWithImages): string {
   )`).join(", ")}${data.problems.length === 1 ? ',' : ''}),
   enable-titlepage: ${data.enableTitlepage},
   enable-header-footer: ${data.enableHeaderFooter},
-  enable-problem-list: ${data.enableProblemList}
+  enable-problem-list: ${data.enableProblemList},
+  titlepage-language: ${data.titlepageLanguage === "auto" ? "auto" : `"${data.titlepageLanguage}"`},
+  problem-language: ${data.problemLanguage === "auto" ? "auto" : `"${data.problemLanguage}"`}
 )`;
 }
 

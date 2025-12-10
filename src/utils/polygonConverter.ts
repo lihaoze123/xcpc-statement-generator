@@ -248,6 +248,8 @@ export class PolygonContestConverter {
       author: 'Polygon Package',
       date: currentDate,
       language: 'zh',
+      titlepage_language: 'auto',
+      problem_language: 'auto',
       enable_titlepage: true,
       enable_header_footer: true,
       enable_problem_list: true,

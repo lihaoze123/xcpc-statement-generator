@@ -32,13 +32,19 @@ export interface Problem {
   statement: ProblemStatement;
 }
 
+// 语言选项类型
+export type LanguageOption = "zh" | "en";
+export type AutoLanguageOption = "auto" | LanguageOption;
+
 // 比赛元数据
 export interface ContestMetadata {
   title: string;
   subtitle: string;
   author: string;
   date: string;
-  language: "zh" | "en";
+  language: LanguageOption;
+  titlepage_language: AutoLanguageOption;
+  problem_language: AutoLanguageOption;
   enable_titlepage: boolean;
   enable_header_footer: boolean;
   enable_problem_list: boolean;

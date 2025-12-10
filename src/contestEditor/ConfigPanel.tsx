@@ -4,7 +4,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlus, faTrash, faInbox, faCopy, faChevronDown } from "@fortawesome/free-solid-svg-icons";
 import Editor from "@monaco-editor/react";
 import { useTranslation } from "react-i18next";
-import type { ContestWithImages, ProblemFormat, ImageData } from "@/types/contest";
+import type { ContestWithImages, ProblemFormat, ImageData, AutoLanguageOption } from "@/types/contest";
 import { saveImageToDB, deleteImageFromDB } from "@/utils/indexedDBUtils";
 
 interface ConfigPanelProps {
@@ -133,6 +133,32 @@ const ConfigPanel: FC<ConfigPanelProps> = ({ contestData, updateContestData }) =
               onChange={(checked) => updateContestData((d) => { d.meta.language = checked ? "en" : "zh"; })}
             />
             <span style={{ marginLeft: 8 }}>{t('editor:englishMode')}</span>
+          </Form.Item>
+          <Form.Item label={t('editor:titlepageLanguage')}>
+            <Select<AutoLanguageOption>
+              size="small"
+              value={contestData.meta.titlepage_language || "auto"}
+              onChange={(value) => updateContestData((d) => { d.meta.titlepage_language = value; })}
+              options={[
+                { label: t('editor:languageAuto'), value: "auto" },
+                { label: t('editor:languageChinese'), value: "zh" },
+                { label: t('editor:languageEnglish'), value: "en" },
+              ]}
+              style={{ width: "100%" }}
+            />
+          </Form.Item>
+          <Form.Item label={t('editor:problemLanguage')}>
+            <Select<AutoLanguageOption>
+              size="small"
+              value={contestData.meta.problem_language || "auto"}
+              onChange={(value) => updateContestData((d) => { d.meta.problem_language = value; })}
+              options={[
+                { label: t('editor:languageAuto'), value: "auto" },
+                { label: t('editor:languageChinese'), value: "zh" },
+                { label: t('editor:languageEnglish'), value: "en" },
+              ]}
+              style={{ width: "100%" }}
+            />
           </Form.Item>
         </Form>
       </Card>
