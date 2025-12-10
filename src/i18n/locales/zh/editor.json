@@ -36,5 +36,6 @@
   "inputPlaceholder": "输入{{field}}",
   "problemPlaceholder": "题目 {{number}}",
   "expand": "展开",
-  "collapse": "收起"
+  "collapse": "收起",
+  "dragToReorder": "拖动排序"
 }

@@ -36,5 +36,6 @@
   "inputPlaceholder": "Enter {{field}}",
   "problemPlaceholder": "Problem {{number}}",
   "expand": "Expand",
-  "collapse": "Collapse"
+  "collapse": "Collapse",
+  "dragToReorder": "Drag to reorder"
 }

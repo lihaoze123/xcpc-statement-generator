@@ -28,6 +28,7 @@ export interface ProblemStatement {
 
 // 完整的题目结构
 export interface Problem {
+  key?: string; // 用于拖拽排序的唯一标识
   problem: ProblemMetadata;
   statement: ProblemStatement;
 }
