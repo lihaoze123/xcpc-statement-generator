@@ -78,7 +78,7 @@ export default defineConfig(async (): Promise<UserConfig> => {
 
 
   return {
-    base: "/xcpc-statement-generator/",
+    base: "/",
     plugins: [react(), TypstFontUrlEntriesPlugin()],
     resolve: {
       alias: [
