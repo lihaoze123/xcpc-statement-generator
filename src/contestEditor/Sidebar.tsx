@@ -28,10 +28,10 @@ const ProblemItem: FC<{
     <div
       className={`
         flex items-center justify-center w-10 h-10 mx-auto my-0.5 rounded-md cursor-grab
-        transition-all duration-150 text-sm font-medium select-none
+        transition-all duration-150 text-sm font-medium select-none border-2
         ${isActive
-          ? 'bg-blue-50 text-[#1D71B7] border-l-3 border-[#1D71B7]'
-          : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
+          ? 'border-[#1D71B7] text-[#1D71B7]'
+          : 'border-transparent text-gray-400 hover:bg-gray-100 hover:text-gray-600'
         }
       `}
       onClick={onClick}
@@ -59,10 +59,10 @@ const Sidebar: FC<SidebarProps> = ({
       {/* Top: Contest Config */}
       <div className="flex justify-center py-2 border-b border-gray-100">
         <button
-          className={`w-10 h-10 rounded-md flex items-center justify-center transition-colors select-none ${
+          className={`w-10 h-10 rounded-md flex items-center justify-center transition-colors select-none border-2 ${
             activeId === 'config'
-              ? 'bg-blue-50 text-[#1D71B7] border-l-3 border-[#1D71B7]'
-              : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
+              ? 'border-[#1D71B7] text-[#1D71B7]'
+              : 'border-transparent text-gray-400 hover:bg-gray-100 hover:text-gray-600'
           }`}
           onClick={() => setActiveId('config')}
           title={t('editor:contestConfig')}
