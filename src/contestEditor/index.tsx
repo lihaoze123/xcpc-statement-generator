@@ -7,6 +7,8 @@ import "allotment/dist/style.css";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { arrayMove } from "@dnd-kit/sortable";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faFileCode, faLanguage, faUpload, faFileZipper, faX } from "@fortawesome/free-solid-svg-icons";
 
 import type { ContestWithImages, ImageData } from "@/types/contest";
 import { exampleStatements } from "./exampleStatements";
@@ -27,6 +29,7 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
   const [activeId, setActiveId] = useState<string>('config');
   const [exportDisabled, setExportDisabled] = useState(true);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const [confirmModalContent, setConfirmModalContent] = useState({ title: '', content: '' });
   const [previewFullscreen, setPreviewFullscreen] = useState(false);
@@ -278,7 +281,7 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd} modifiers={[restrictToVerticalAxis]}>
       <div className="flex h-full w-full bg-white overflow-hidden">
         {/* Left Sidebar */}
-        <div className="w-[220px] flex-shrink-0 border-r border-gray-200 bg-white z-10">
+        <div className="w-12 flex-shrink-0 border-r border-gray-200 bg-white z-10">
           <Sidebar
             contestData={contestData}
             activeId={activeId}
@@ -286,13 +289,8 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
             onAddProblem={handleAddProblem}
             onDeleteProblem={handleDeleteProblem}
             onExportPdf={handleExportPdf}
-            onExportConfig={handleExport}
-            onImportConfig={handleImport}
-            onImportPolygon={handleImportPolygonPackage}
-            onLoadExample={handleLoadExample}
             exportDisabled={exportDisabled}
-            toggleLanguage={toggleLanguage}
-            examples={Object.keys(exampleStatements)}
+            onOpenSettings={() => setShowSettings(true)}
           />
         </div>
 
@@ -336,6 +334,42 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
               </div>
             </div>
             <div className="modal-backdrop" onClick={() => setShowConfirmModal(false)}></div>
+          </div>
+        )}
+
+        {/* Settings Modal */}
+        {showSettings && (
+          <div className="modal modal-open">
+            <div className="modal-box max-w-sm">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="font-bold text-lg">{t('common:settings')}</h3>
+                <button className="btn btn-sm btn-ghost" onClick={() => setShowSettings(false)}>
+                  <FontAwesomeIcon icon={faX} />
+                </button>
+              </div>
+              <div className="flex flex-col gap-3">
+                <button className="btn btn-outline btn-sm justify-start gap-3" onClick={() => { setShowSettings(false); toggleLanguage(); }}>
+                  <FontAwesomeIcon icon={faLanguage} />
+                  <span>{i18n.language === "zh" ? "English" : "中文"}</span>
+                </button>
+                <button className="btn btn-outline btn-sm justify-start gap-3" onClick={() => { setShowSettings(false); handleLoadExample("English Example"); }}>
+                  <span>{t('common:loadExample')}</span>
+                </button>
+                <button className="btn btn-outline btn-sm justify-start gap-3" onClick={() => { setShowSettings(false); handleImportPolygonPackage(); }}>
+                  <FontAwesomeIcon icon={faFileZipper} />
+                  <span>{t('common:importPolygonPackage')}</span>
+                </button>
+                <button className="btn btn-outline btn-sm justify-start gap-3" onClick={() => { setShowSettings(false); handleImport(); }}>
+                  <FontAwesomeIcon icon={faUpload} />
+                  <span>{t('common:importConfig')}</span>
+                </button>
+                <button className="btn btn-outline btn-sm justify-start gap-3" onClick={() => { setShowSettings(false); handleExport(); }}>
+                  <FontAwesomeIcon icon={faFileCode} />
+                  <span>{t('common:exportConfig')}</span>
+                </button>
+              </div>
+            </div>
+            <div className="modal-backdrop" onClick={() => setShowSettings(false)}></div>
           </div>
         )}
       </div>
