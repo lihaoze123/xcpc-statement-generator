@@ -399,6 +399,7 @@ const EditorArea: FC<EditorAreaProps> = ({ contestData, updateContestData, activ
     return (
       <div className="h-full overflow-hidden bg-white">
         <SingleProblemEditor
+          key={problem.key ?? `problem-${problemIndex}`}
           problem={problem}
           index={problemIndex}
           onUpdate={(updater) => updateContestData((draft) => updater(draft.problems[problemIndex]))}

@@ -163,6 +163,7 @@
   // 封面页
   if enable-titlepage {
     set page(
+      paper: "a4",
       margin: (top: 8cm, bottom: 3cm, left: 2.5cm, right: 2.5cm),
     )
     set par(spacing: 0.8em)
@@ -215,6 +216,7 @@
     show heading: set text(font: fonts.sans)
 
     set page(
+      paper: "a4",
       margin: (top: 3cm, bottom: 2.5cm, x: 2.5cm),
       header: if enable-header-footer {
         [
@@ -245,7 +247,12 @@
 
     if problems != none {
       for (i, e) in problems.enumerate() {
-        e.problem.display-name = "Problem " + str.from-unicode(int(i) + 65) + ". " + e.problem.display_name
+        let display-name = if problems.len() > 1 {
+          "Problem " + str.from-unicode(int(i) + 65) + ". " + e.problem.display_name
+        } else {
+          e.problem.display_name
+        }
+        e.problem.display-name = display-name
         render-problem(e.problem, e.statement, language: problem-lang)
 
         if i < problems.len() - 1 {

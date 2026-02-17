@@ -309,6 +309,23 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
     setExportDisabled(false);
   };
 
+  const previewData = useMemo<ContestWithImages>(() => {
+    const problemIndex = contestData.problems.findIndex((p) => p.key === activeId);
+    if (problemIndex === -1) return contestData;
+
+    const selectedProblem = contestData.problems[problemIndex];
+    return {
+      ...contestData,
+      meta: {
+        ...contestData.meta,
+        enable_titlepage: false,
+        enable_problem_list: false,
+        enable_header_footer: false,
+      },
+      problems: [{ ...selectedProblem }],
+    };
+  }, [contestData, activeId]);
+
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd} modifiers={[restrictToVerticalAxis]}>
       <div className="flex h-full w-full bg-white overflow-hidden">
@@ -347,7 +364,7 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
             {previewVisible && (
               <Allotment.Pane minSize={400}>
                 <PreviewArea
-                  data={contestData}
+                  data={previewData}
                   previewRef={previewRef}
                   isFullscreen={previewFullscreen}
                   setFullscreen={setPreviewFullscreen}

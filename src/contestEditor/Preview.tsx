@@ -204,6 +204,7 @@ const Preview = forwardRef<PreviewHandle, PreviewProps>(({ data, onPageInfoChang
       })
       .catch((e) => {
         if (!mounted) return;
+        if (String(e) === "Aborted") return;
         setError(e instanceof Error ? e.message : String(e));
         setLoading(false);
       });

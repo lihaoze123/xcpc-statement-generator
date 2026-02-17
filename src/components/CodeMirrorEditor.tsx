@@ -37,14 +37,23 @@ const CodeMirrorEditor: React.FC<CodeMirrorEditorProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
+  const onChangeRef = useRef<typeof onChange>(onChange);
+  const isApplyingExternalValueRef = useRef(false);
+
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
 
   useEffect(() => {
     if (!containerRef.current) return;
 
     const updateListener = EditorView.updateListener.of((update) => {
-      if (update.docChanged && onChange) {
-        onChange(update.state.doc.toString());
+      if (!update.docChanged) return;
+      if (isApplyingExternalValueRef.current) {
+        isApplyingExternalValueRef.current = false;
+        return;
       }
+      onChangeRef.current?.(update.state.doc.toString());
     });
 
     const extensions: any[] = [
@@ -85,13 +94,14 @@ const CodeMirrorEditor: React.FC<CodeMirrorEditorProps> = ({
     return () => {
       view.destroy();
     };
-  }, [language, vimMode]);
+  }, [language, vimMode, minHeight, showLineNumbers]);
 
   // Update content when value changes externally
   useEffect(() => {
     if (viewRef.current) {
       const currentValue = viewRef.current.state.doc.toString();
       if (currentValue !== value) {
+        isApplyingExternalValueRef.current = true;
         viewRef.current.dispatch({
           changes: { from: 0, to: currentValue.length, insert: value }
         });
