@@ -126,14 +126,21 @@ async function addImagesToFilesystem(contest: ContestWithImages): Promise<void> 
   }
 }
 
-function buildTypstDocument(contest: ContestWithImages): string {
+function buildTypstDocument(contest: ContestWithImages, problemKey?: string): string {
+  let problems = contest.problems;
+
+  // 如果指定了 problemKey，则只编译该题目
+  if (problemKey) {
+    problems = problems.filter(p => p.key === problemKey);
+  }
+
   const data = {
     title: contest.meta.title,
     subtitle: contest.meta.subtitle,
     author: contest.meta.author,
     date: contest.meta.date,
     language: contest.meta.language,
-    problems: contest.problems.map((p) => ({
+    problems: problems.map((p) => ({
       problem: {
         display_name: p.problem.display_name,
         format: p.problem.format || "latex",
@@ -146,9 +153,10 @@ function buildTypstDocument(contest: ContestWithImages): string {
         notes: p.statement.notes || null
       }
     })),
-    enableTitlepage: contest.meta.enable_titlepage,
+    // 导出单题时禁用标题页和题号列表
+    enableTitlepage: problemKey ? false : contest.meta.enable_titlepage,
     enableHeaderFooter: contest.meta.enable_header_footer,
-    enableProblemList: contest.meta.enable_problem_list,
+    enableProblemList: problemKey ? false : contest.meta.enable_problem_list,
     titlepageLanguage: contest.meta.titlepage_language || "auto",
     problemLanguage: contest.meta.problem_language || "auto"
   };
@@ -182,13 +190,13 @@ function buildTypstDocument(contest: ContestWithImages): string {
 )`;
 }
 
-async function compileToPdf(contest: ContestWithImages): Promise<Uint8Array> {
+async function compileToPdf(contest: ContestWithImages, problemKey?: string): Promise<Uint8Array> {
   if (!isInitialized) throw new Error("Typst compiler not initialized");
 
   // Add images to virtual filesystem
   await addImagesToFilesystem(contest);
 
-  const doc = buildTypstDocument(contest);
+  const doc = buildTypstDocument(contest, problemKey);
   $typst.addSource("/main.typ", doc);
 
   const pdf = await $typst.pdf({ mainFilePath: "/main.typ" });
@@ -236,6 +244,13 @@ self.addEventListener('message', async (event) => {
         const pdf = await compileToPdf(data as ContestWithImages);
         self.postMessage({ id, success: true, data: pdf });
         break;
+
+      case "compileProblem": {
+        const { contest, problemKey } = data;
+        const pdf = await compileToPdf(contest, problemKey);
+        self.postMessage({ id, success: true, data: pdf });
+        break;
+      }
 
       case "renderTypst":
         const svg = await renderToSvg(data as ContestWithImages);
