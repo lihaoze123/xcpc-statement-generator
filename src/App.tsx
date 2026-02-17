@@ -1,4 +1,7 @@
 import type { FC } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faGithub } from "@fortawesome/free-brands-svg-icons";
+import { name as appName, version as appVersion } from "../package.json";
 import TypstInitStatusProvider from "./components/TypstInitStatusProvider";
 import { ToastProvider } from "./components/ToastProvider";
 import ContestEditor from "./contestEditor";
@@ -9,8 +12,20 @@ const App: FC = () => {
   return (
     <ToastProvider>
       <TypstInitStatusProvider>
-        <div className="w-screen h-screen overflow-hidden text-gray-800 flex flex-col">
-          <ContestEditor />
+        <div className="app w-screen h-screen overflow-hidden text-gray-800 flex flex-col">
+          <main className="flex-1 min-h-0 m-0 mx-4 mb-3">
+            <ContestEditor />
+          </main>
+          <footer>
+            <a
+              href="https://github.com/lihaoze123/xcpc-statement-generator"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <FontAwesomeIcon icon={faGithub} className="mr-1" />
+              {appName} v{appVersion} ({GIT_COMMIT_INFO}) · Developed by chumeng with ❤️
+            </a>
+          </footer>
         </div>
       </TypstInitStatusProvider>
     </ToastProvider>
