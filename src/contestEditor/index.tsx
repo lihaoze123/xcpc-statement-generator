@@ -60,6 +60,11 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const [confirmModalContent, setConfirmModalContent] = useState({ title: '', content: '' });
   const [previewFullscreen, setPreviewFullscreen] = useState(false);
+  const [previewVisible, setPreviewVisible] = useState(true);
+  const [vimMode, setVimMode] = useState(() => {
+    const saved = localStorage.getItem("vimMode");
+    return saved ? saved === "true" : false;
+  });
   const previewRef = useRef<PreviewHandle>(null);
   const { t, i18n } = useTranslation();
   const { showToast } = useToast();
@@ -319,6 +324,8 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
             exportDisabled={exportDisabled}
             onOpenSettings={() => setShowSettings(true)}
             onOpenImages={() => setActiveId('images')}
+            previewVisible={previewVisible}
+            onTogglePreview={() => setPreviewVisible(!previewVisible)}
           />
         </div>
 
@@ -332,18 +339,21 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
                 updateContestData={updateContestData}
                 activeId={activeId}
                 onDeleteProblem={handleDeleteProblem}
+                vimMode={vimMode}
               />
             </Allotment.Pane>
 
             {/* Preview Area */}
-            <Allotment.Pane minSize={400}>
-              <PreviewArea
-                data={contestData}
-                previewRef={previewRef}
-                isFullscreen={previewFullscreen}
-                setFullscreen={setPreviewFullscreen}
-              />
-            </Allotment.Pane>
+            {previewVisible && (
+              <Allotment.Pane minSize={400}>
+                <PreviewArea
+                  data={contestData}
+                  previewRef={previewRef}
+                  isFullscreen={previewFullscreen}
+                  setFullscreen={setPreviewFullscreen}
+                />
+              </Allotment.Pane>
+            )}
           </Allotment>
         </div>
 
@@ -381,6 +391,18 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
                 <button className="btn btn-outline btn-lg justify-start gap-4 h-14" onClick={() => { setShowSettings(false); toggleLanguage(); }}>
                   <FontAwesomeIcon icon={faLanguage} className="text-xl w-6" />
                   <span className="text-base">{i18n.language === "zh" ? "切换到英文" : "Switch to 中文"}</span>
+                </button>
+
+                {/* Vim Mode Toggle */}
+                <button
+                  className={`btn btn-outline btn-lg justify-start gap-4 h-14 ${vimMode ? 'border-[#1D71B7] text-[#1D71B7]' : ''}`}
+                  onClick={() => {
+                    const newValue = !vimMode;
+                    setVimMode(newValue);
+                    localStorage.setItem("vimMode", String(newValue));
+                  }}
+                >
+                  <span className="text-base">{vimMode ? 'Vim 模式 (已开启)' : 'Vim 模式'}</span>
                 </button>
 
                 {/* Image Management */}

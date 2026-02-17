@@ -1,17 +1,20 @@
 import { type FC, useState } from "react";
 import type { ContestWithImages, Problem, ProblemFormat, ImageData, AutoLanguageOption } from "@/types/contest";
 import { useTranslation } from "react-i18next";
-import Editor from "@monaco-editor/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlus, faTrash, faInbox, faCopy, faChevronDown } from "@fortawesome/free-solid-svg-icons";
+import { faTrash, faInbox, faCopy, faChevronDown } from "@fortawesome/free-solid-svg-icons";
 import { saveImageToDB, deleteImageFromDB } from "@/utils/indexedDBUtils";
 import { useToast } from "@/components/ToastProvider";
+import TabBar, { type TabId } from "@/components/TabBar";
+import CodeMirrorEditor from "@/components/CodeMirrorEditor";
+import SamplesEditor from "@/components/SamplesEditor";
 
 interface EditorAreaProps {
   contestData: ContestWithImages;
   updateContestData: (update: (draft: ContestWithImages) => void) => void;
   activeId: string;
   onDeleteProblem: (key: string) => void;
+  vimMode?: boolean;
 }
 
 interface ConfigFormProps {
@@ -258,14 +261,77 @@ const SingleProblemEditor: FC<{
   index: number;
   onUpdate: (updater: (p: Problem) => void) => void;
   onDelete: () => void;
-}> = ({ problem, index, onUpdate, onDelete }) => {
+  vimMode?: boolean;
+}> = ({ problem, index, onUpdate, onDelete, vimMode = false }) => {
   const { t } = useTranslation();
-  const lang = problem.problem.format === "markdown" ? "markdown" : problem.problem.format === "typst" ? "plaintext" : "latex";
+  const [activeTab, setActiveTab] = useState<TabId>("description");
+
+  const lang = problem.problem.format === "markdown" ? "markdown"
+    : problem.problem.format === "typst" ? "typst"
+    : "latex";
+
+  const renderEditor = () => {
+    switch (activeTab) {
+      case "description":
+        return (
+          <CodeMirrorEditor
+            value={problem.statement.description}
+            onChange={(val) => onUpdate((p) => { p.statement.description = val; })}
+            language={lang}
+            minHeight="calc(100vh - 200px)"
+            vimMode={vimMode}
+            showLineNumbers={true}
+          />
+        );
+      case "input":
+        return (
+          <CodeMirrorEditor
+            value={problem.statement.input || ""}
+            onChange={(val) => onUpdate((p) => { p.statement.input = val; })}
+            language={lang}
+            minHeight="calc(100vh - 200px)"
+            vimMode={vimMode}
+            showLineNumbers={true}
+          />
+        );
+      case "output":
+        return (
+          <CodeMirrorEditor
+            value={problem.statement.output || ""}
+            onChange={(val) => onUpdate((p) => { p.statement.output = val; })}
+            language={lang}
+            minHeight="calc(100vh - 200px)"
+            vimMode={vimMode}
+            showLineNumbers={true}
+          />
+        );
+      case "notes":
+        return (
+          <CodeMirrorEditor
+            value={problem.statement.notes || ""}
+            onChange={(val) => onUpdate((p) => { p.statement.notes = val; })}
+            language={lang}
+            minHeight="calc(100vh - 200px)"
+            vimMode={vimMode}
+            showLineNumbers={true}
+          />
+        );
+      case "samples":
+        return (
+          <SamplesEditor
+            samples={problem.problem.samples}
+            onUpdate={(samples) => onUpdate((p) => { p.problem.samples = samples; })}
+            vimMode={vimMode}
+          />
+        );
+    }
+  };
 
   return (
-    <div className="p-6 h-full overflow-y-auto custom-scroll">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-semibold text-gray-800">
+    <div className="h-full flex flex-col bg-white">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+        <h2 className="text-lg font-semibold text-gray-800">
           {String.fromCharCode(65 + index)}. {problem.problem.display_name}
         </h2>
         <div className="flex items-center gap-2">
@@ -288,116 +354,29 @@ const SingleProblemEditor: FC<{
         </div>
       </div>
 
-      <div className="space-y-5 max-w-3xl">
-        <div className="form-control">
-          <label className="label py-1"><span className="form-label">{t('editor:problemName')}</span></label>
-          <input
-            type="text"
-            className="input input-bordered w-full"
-            value={problem.problem.display_name}
-            onChange={(e) => onUpdate((p) => { p.problem.display_name = e.target.value; })}
-          />
-        </div>
+      {/* Problem Name */}
+      <div className="px-4 py-3 border-b border-gray-100">
+        <input
+          type="text"
+          className="input input-bordered w-full"
+          value={problem.problem.display_name}
+          onChange={(e) => onUpdate((p) => { p.problem.display_name = e.target.value; })}
+          placeholder={t('editor:problemName')}
+        />
+      </div>
 
-        <div className="form-control flex flex-col" style={{ minHeight: "250px" }}>
-          <label className="label py-1"><span className="form-label">{t('editor:problemDescription')}</span></label>
-          <div className="flex-1 border border-gray-300 rounded-lg overflow-hidden">
-            <Editor
-              language={lang}
-              value={problem.statement.description}
-              onChange={(val) => onUpdate((p) => { p.statement.description = val || ""; })}
-              options={{ minimap: { enabled: false }, wordWrap: "on", fontSize: 14 }}
-            />
-          </div>
-        </div>
+      {/* Tab Bar */}
+      <TabBar activeTab={activeTab} onTabChange={setActiveTab} />
 
-        <div className="grid grid-cols-2 gap-4">
-          <div className="form-control flex flex-col h-56">
-            <label className="label py-1"><span className="form-label">{t('editor:inputFormat')}</span></label>
-            <div className="flex-1 border border-gray-300 rounded-lg overflow-hidden">
-              <Editor
-                language={lang}
-                value={problem.statement.input || ""}
-                onChange={(val) => onUpdate((p) => { p.statement.input = val || ""; })}
-                options={{ minimap: { enabled: false }, wordWrap: "on", fontSize: 14 }}
-              />
-            </div>
-          </div>
-          <div className="form-control flex flex-col h-56">
-            <label className="label py-1"><span className="form-label">{t('editor:outputFormat')}</span></label>
-            <div className="flex-1 border border-gray-300 rounded-lg overflow-hidden">
-              <Editor
-                language={lang}
-                value={problem.statement.output || ""}
-                onChange={(val) => onUpdate((p) => { p.statement.output = val || ""; })}
-                options={{ minimap: { enabled: false }, wordWrap: "on", fontSize: 14 }}
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="form-control flex flex-col h-40">
-          <label className="label py-1"><span className="form-label">{t('editor:hints')}</span></label>
-          <div className="flex-1 border border-gray-300 rounded-lg overflow-hidden">
-            <Editor
-              language={lang}
-              value={problem.statement.notes || ""}
-              onChange={(val) => onUpdate((p) => { p.statement.notes = val || ""; })}
-              options={{ minimap: { enabled: false }, wordWrap: "on", fontSize: 14 }}
-            />
-          </div>
-        </div>
-
-        {/* Samples */}
-        <div>
-          <h3 className="form-label mb-3">{t('editor:sampleInputOutput')}</h3>
-          <div className="space-y-4">
-            {problem.problem.samples.map((sample, sIdx) => (
-              <div key={sIdx} className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="font-medium text-sm">{t('editor:sampleNumber', { number: sIdx + 1 })}</span>
-                  <button
-                    className="btn btn-ghost btn-xs text-gray-400 hover:text-red-500"
-                    onClick={() => onUpdate((p) => { p.problem.samples.splice(sIdx, 1); })}
-                  >
-                    <FontAwesomeIcon icon={faTrash} />
-                  </button>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="h-24 border border-gray-300 rounded overflow-hidden">
-                    <Editor
-                      language="plaintext"
-                      value={sample.input}
-                      onChange={(val) => onUpdate((p) => { p.problem.samples[sIdx].input = val || ""; })}
-                      options={{ minimap: { enabled: false }, fontSize: 13, fontFamily: "monospace" }}
-                    />
-                  </div>
-                  <div className="h-24 border border-gray-300 rounded overflow-hidden">
-                    <Editor
-                      language="plaintext"
-                      value={sample.output}
-                      onChange={(val) => onUpdate((p) => { p.problem.samples[sIdx].output = val || ""; })}
-                      options={{ minimap: { enabled: false }, fontSize: 13, fontFamily: "monospace" }}
-                    />
-                  </div>
-                </div>
-              </div>
-            ))}
-            <button
-              className="btn btn-outline btn-sm w-full"
-              onClick={() => onUpdate((p) => { p.problem.samples.push({ input: "", output: "" }); })}
-            >
-              <FontAwesomeIcon icon={faPlus} className="mr-2" />
-              {t('editor:addSample')}
-            </button>
-          </div>
-        </div>
+      {/* Editor Content */}
+      <div className="flex-1 overflow-hidden p-4">
+        {renderEditor()}
       </div>
     </div>
   );
 };
 
-const EditorArea: FC<EditorAreaProps> = ({ contestData, updateContestData, activeId, onDeleteProblem }) => {
+const EditorArea: FC<EditorAreaProps> = ({ contestData, updateContestData, activeId, onDeleteProblem, vimMode = false }) => {
   if (activeId === 'config') {
     return (
       <div className="h-full overflow-y-auto bg-white custom-scroll">
@@ -424,6 +403,7 @@ const EditorArea: FC<EditorAreaProps> = ({ contestData, updateContestData, activ
           index={problemIndex}
           onUpdate={(updater) => updateContestData((draft) => updater(draft.problems[problemIndex]))}
           onDelete={() => onDeleteProblem(problem.key!)}
+          vimMode={vimMode}
         />
       </div>
     );

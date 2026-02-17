@@ -38,5 +38,7 @@
   "problemPlaceholder": "Problem {{number}}",
   "expand": "Expand",
   "collapse": "Collapse",
-  "dragToReorder": "Drag to reorder"
+  "dragToReorder": "Drag to reorder",
+  "showPreview": "Show Preview",
+  "hidePreview": "Hide Preview"
 }

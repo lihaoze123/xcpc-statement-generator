@@ -12,7 +12,7 @@ interface PreviewAreaProps {
 }
 
 const PreviewArea: FC<PreviewAreaProps> = ({ data, previewRef, isFullscreen, setFullscreen }) => {
-  const [zoom, setZoom] = useState(75);
+  const [zoom, setZoom] = useState(100);
   const [pageInfo, setPageInfo] = useState<PreviewPageInfo>({ currentPage: 1, totalPages: 1 });
   const [pageInput, setPageInput] = useState("1");
 
@@ -42,6 +42,7 @@ const PreviewArea: FC<PreviewAreaProps> = ({ data, previewRef, isFullscreen, set
           className="mx-auto bg-white shadow-sm transition-transform duration-200 origin-top"
           style={{
             width: '210mm',
+            maxWidth: '100%',
             minHeight: '297mm',
             transform: `scale(${zoom / 100})`,
             marginBottom: isFullscreen ? '100px' : '0'

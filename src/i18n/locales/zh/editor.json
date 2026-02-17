@@ -38,5 +38,7 @@
   "problemPlaceholder": "题目 {{number}}",
   "expand": "展开",
   "collapse": "收起",
-  "dragToReorder": "拖动排序"
+  "dragToReorder": "拖动排序",
+  "showPreview": "显示预览",
+  "hidePreview": "隐藏预览"
 }

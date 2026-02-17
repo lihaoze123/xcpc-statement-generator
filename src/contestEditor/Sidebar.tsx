@@ -1,6 +1,6 @@
 import { type FC, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faGear, faPlus, faFilePdf, faPenToSquare, faImages, faTrash, faEdit } from "@fortawesome/free-solid-svg-icons";
+import { faGear, faPlus, faFilePdf, faPenToSquare, faImages, faTrash, faEdit, faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
 import { useTranslation } from "react-i18next";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -16,6 +16,8 @@ interface SidebarProps {
   exportDisabled: boolean;
   onOpenSettings: () => void;
   onOpenImages: () => void;
+  previewVisible: boolean;
+  onTogglePreview: () => void;
 }
 
 // 简化的题目项组件
@@ -67,6 +69,8 @@ const Sidebar: FC<SidebarProps> = ({
   exportDisabled,
   onOpenSettings,
   onOpenImages,
+  previewVisible,
+  onTogglePreview,
 }) => {
   const { t } = useTranslation();
   const [menuState, setMenuState] = useState<{ open: boolean; x: number; y: number; problemKey: string }>({
@@ -85,8 +89,8 @@ const Sidebar: FC<SidebarProps> = ({
 
   return (
     <div className="flex flex-col h-full bg-white">
-      {/* Top: Contest Config */}
-      <div className="flex justify-center py-2 border-b border-gray-100">
+      {/* Top: Contest Config + Preview Toggle */}
+      <div className="flex flex-col items-center py-2 border-b border-gray-100 gap-1">
         <button
           className={`w-10 h-10 rounded-md flex items-center justify-center transition-colors select-none border-2 ${
             activeId === 'config'
@@ -97,6 +101,13 @@ const Sidebar: FC<SidebarProps> = ({
           title={t('editor:contestConfig')}
         >
           <FontAwesomeIcon icon={faPenToSquare} className="text-lg" />
+        </button>
+        <button
+          className="w-10 h-8 rounded-md flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors select-none"
+          onClick={onTogglePreview}
+          title={previewVisible ? t('editor:hidePreview') : t('editor:showPreview')}
+        >
+          <FontAwesomeIcon icon={previewVisible ? faEye : faEyeSlash} className="text-base" />
         </button>
       </div>
 
