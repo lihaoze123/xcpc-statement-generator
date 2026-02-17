@@ -5,6 +5,7 @@ import Editor from "@monaco-editor/react";
 import { useTranslation } from "react-i18next";
 import type { ContestWithImages, ProblemFormat, ImageData, AutoLanguageOption, Problem } from "@/types/contest";
 import { saveImageToDB, deleteImageFromDB } from "@/utils/indexedDBUtils";
+import { useToast } from "@/components/ToastProvider";
 import {
   DndContext,
   closestCenter,
@@ -250,24 +251,9 @@ const ProblemItem: FC<ProblemItemProps> = ({
   );
 };
 
-// Toast helper
-const showToast = (toastMessage: string, type: 'success' | 'error' | 'info' = 'info') => {
-  const existingToast = document.querySelector('.toast-container');
-  if (existingToast) existingToast.remove();
-
-  const toast = document.createElement('div');
-  toast.className = 'toast toast-end toast-bottom z-50';
-  toast.innerHTML = `
-    <div class="alert alert-${type}">
-      <span>${toastMessage}</span>
-    </div>
-  `;
-  document.body.appendChild(toast);
-  setTimeout(() => toast.remove(), 3000);
-};
-
 const ConfigPanel: FC<ConfigPanelProps> = ({ contestData, updateContestData }) => {
   const { t } = useTranslation();
+  const { showToast } = useToast();
 
   // 确保所有题目都有唯一的 key
   useEffect(() => {
@@ -293,6 +279,49 @@ const ConfigPanel: FC<ConfigPanelProps> = ({ contestData, updateContestData }) =
   const [expandedProblems, setExpandedProblems] = useState<Set<string>>(
     new Set()
   );
+
+  // State to track drag-over for file upload
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+
+  // Handle drag events for file upload
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(false);
+
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      for (const file of Array.from(files)) {
+        if (!["image/png", "image/jpeg", "image/gif", "image/svg+xml"].includes(file.type)) {
+          showToast(t('messages:unsupportedImageType'), 'error');
+          continue;
+        }
+        try {
+          await handleAddImage(file);
+        } catch (err) {
+          console.error("Failed to add image:", err);
+          showToast(t('messages:imageUploadFailed'), 'error');
+        }
+      }
+    }
+  };
 
   // Toggle problem expansion
   const toggleProblemExpansion = (key: string) => {
@@ -527,7 +556,13 @@ const ConfigPanel: FC<ConfigPanelProps> = ({ contestData, updateContestData }) =
         <div className="card-body p-4">
           <h2 className="section-title">{t('editor:imageManagement')}</h2>
           <div className="image-upload-section">
-            <label className="upload-zone flex flex-col items-center justify-center w-full h-32">
+            <label
+              className={`upload-zone flex flex-col items-center justify-center w-full h-32 ${isDraggingOver ? 'border-2 border-dashed border-primary bg-primary/5' : ''}`}
+              onDragOver={handleDragOver}
+              onDragEnter={handleDragEnter}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+            >
               <input
                 type="file"
                 className="hidden"
@@ -622,13 +657,18 @@ const ConfigPanel: FC<ConfigPanelProps> = ({ contestData, updateContestData }) =
                   />
                 ))}
 
-                <button className="btn-add-problem w-full" onClick={() => updateContestData((d) => {
-                  d.problems.push({
-                    key: crypto.randomUUID(),
-                    problem: { display_name: t('editor:problemPlaceholder', { number: d.problems.length + 1 }), samples: [{ input: "", output: "" }] },
-                    statement: { description: "", input: "", output: "", notes: "" },
+                <button className="btn-add-problem w-full" onClick={() => {
+                  const newKey = crypto.randomUUID();
+                  updateContestData((d) => {
+                    d.problems.push({
+                      key: newKey,
+                      problem: { display_name: t('editor:problemPlaceholder', { number: d.problems.length + 1 }), samples: [{ input: "", output: "" }] },
+                      statement: { description: "", input: "", output: "", notes: "" },
+                    });
                   });
-                })}>
+                  // Auto-expand new problem and collapse others
+                  setExpandedProblems(new Set([newKey]));
+                }}>
                   <FontAwesomeIcon icon={faPlus} className="mr-1" />
                   {t('editor:addProblem')}
                 </button>

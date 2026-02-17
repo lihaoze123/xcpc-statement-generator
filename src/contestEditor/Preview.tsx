@@ -55,6 +55,9 @@ const Preview = ({ data }: { data: ContestWithImages }) => {
     return () => { mounted = false; };
   }, [data]);
 
+  // Show loading overlay over existing SVG instead of clearing it
+  const showLoadingOverlay = loading && svg;
+
   useEffect(() => {
     const container = previewContainerRef.current;
     if (!container) return;
@@ -101,15 +104,23 @@ const Preview = ({ data }: { data: ContestWithImages }) => {
           </div>
         </div>
       )}
+      {/* Initial loading state - show spinner only when no SVG */}
       {loading && !svg && (
         <div className="flex justify-center items-center h-full min-h-[200px]">
           <span className="loading loading-spinner loading-lg"></span>
           <span className="ml-2">正在编译...</span>
         </div>
       )}
+      {/* Show SVG with loading overlay - no flickering */}
       {svg && (
-        <div className="preview-container" ref={previewContainerRef}>
+        <div className="preview-container relative" ref={previewContainerRef}>
           <TypstPreviewContainer svg={svg} />
+          {showLoadingOverlay && (
+            <div className="absolute inset-0 bg-white/50 flex items-center justify-center">
+              <span className="loading loading-spinner loading-md"></span>
+              <span className="ml-2 text-sm">正在重新编译...</span>
+            </div>
+          )}
         </div>
       )}
     </div>

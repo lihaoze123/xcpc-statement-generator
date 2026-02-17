@@ -23,5 +23,7 @@
   "downloadCompiler": "Download Compiler",
   "downloadFont": "Download Font",
   "requestFontAccess": "Request Access to Local Fonts",
-  "fontAccessDescription": "Allowing access to local fonts can reduce download size."
+  "fontAccessDescription": "Allowing access to local fonts can reduce download size.",
+  "initializingTypst": "Initializing Typst compiler...",
+  "downloadingCompiler": "Downloading compiler and fonts"
 }

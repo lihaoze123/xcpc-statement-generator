@@ -4,32 +4,19 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFileArrowDown, faFileImport, faFileExport, faChevronDown, faFolderOpen, faExpand, faCompress, faMagnifyingGlassPlus, faMagnifyingGlassMinus } from "@fortawesome/free-solid-svg-icons";
 import { debounce } from "lodash";
 import { useTranslation } from "react-i18next";
+import { Allotment } from "allotment";
+import "allotment/dist/style.css";
 
 import type { ContestWithImages, ImageData } from "@/types/contest";
 import { exampleStatements } from "./exampleStatements";
 import { compileToPdf, typstInitPromise, registerImages } from "@/compiler";
 import { saveConfigToDB, loadConfigFromDB, exportConfig, importConfig, clearDB, saveImageToDB } from "@/utils/indexedDBUtils";
 import { loadPolygonPackage } from "@/utils/polygonConverter";
+import { useToast } from "@/components/ToastProvider";
 import ConfigPanel from "./ConfigPanel";
 import Preview from "./Preview";
 
 import "./index.css";
-
-// Toast helper
-const showToast = (toastMessage: string, type: 'success' | 'error' | 'info' = 'info') => {
-  const existingToast = document.querySelector('.toast-container');
-  if (existingToast) existingToast.remove();
-
-  const toast = document.createElement('div');
-  toast.className = 'toast toast-end toast-bottom z-50';
-  toast.innerHTML = `
-    <div class="alert alert-${type}">
-      <span>${toastMessage}</span>
-    </div>
-  `;
-  document.body.appendChild(toast);
-  setTimeout(() => toast.remove(), 3000);
-};
 
 const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData }) => {
   const [contestData, updateContestData] = useImmer<ContestWithImages>(initialData);
@@ -40,6 +27,7 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
   const [previewFullscreen, setPreviewFullscreen] = useState(false);
   const [previewZoom, setPreviewZoom] = useState(100);
   const { t } = useTranslation();
+  const { showToast } = useToast();
 
   // Debounced auto-save
   const debouncedSave = useMemo(() =>
@@ -295,18 +283,28 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
       </div>
 
       {/* Main Content */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left: Config Panel */}
-        <div className={`${previewFullscreen ? 'hidden' : 'w-1/2'} custom-scroll min-w-[400px] overflow-y-auto p-4 border-r border-gray-200 bg-white transition-all duration-200`}>
-          <ConfigPanel contestData={contestData} updateContestData={updateContestData} />
-        </div>
-        {/* Right: Preview Area */}
-        <div className={`${previewFullscreen ? 'w-full' : 'w-1/2'} custom-scroll flex-1 overflow-y-auto`} style={{ backgroundColor: '#F3F4F6', padding: previewFullscreen ? '24px' : '24px 24px' }}>
+      {previewFullscreen ? (
+        <div className="flex-1 custom-scroll overflow-y-auto" style={{ backgroundColor: '#F3F4F6', padding: '24px' }}>
           <div className="a4-paper min-h-[297mm] p-8 transition-transform duration-200" style={{ transform: `scale(${previewZoom / 100})`, transformOrigin: 'top center' }}>
             <Preview data={contestData} />
           </div>
         </div>
-      </div>
+      ) : (
+        <Allotment className="flex-1">
+          <Allotment.Pane minSize={300}>
+            <div className="custom-scroll h-full overflow-y-auto p-4 border-r border-gray-200 bg-white">
+              <ConfigPanel contestData={contestData} updateContestData={updateContestData} />
+            </div>
+          </Allotment.Pane>
+          <Allotment.Pane>
+            <div className="custom-scroll h-full overflow-y-auto" style={{ backgroundColor: '#F3F4F6', padding: '24px' }}>
+              <div className="a4-paper min-h-[297mm] p-8 transition-transform duration-200" style={{ transform: `scale(${previewZoom / 100})`, transformOrigin: 'top center' }}>
+                <Preview data={contestData} />
+              </div>
+            </div>
+          </Allotment.Pane>
+        </Allotment>
+      )}
 
       {/* Custom Modal */}
       {showConfirmModal && (

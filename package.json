@@ -21,6 +21,7 @@
     "@myriaddreamin/typst-ts-renderer": "^0.6.1-rc5",
     "@myriaddreamin/typst-ts-web-compiler": "^0.6.1-rc5",
     "@myriaddreamin/typst.ts": "^0.6.1-rc5",
+    "allotment": "^1.20.5",
     "axios": "^1.13.2",
     "fontkit": "^2.0.4",
     "i18next": "^25.7.2",

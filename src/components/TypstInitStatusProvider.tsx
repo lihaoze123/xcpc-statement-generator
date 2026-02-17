@@ -3,7 +3,7 @@ import { typstInitStatus, fontAccessConfirmResolve } from "@/compiler";
 import { useTranslation } from "react-i18next";
 
 const TypstInitStatusProvider: FC<{ children: ReactNode }> = ({ children }) => {
-  const [, setStatus] = useState(typstInitStatus);
+  const [status, setStatus] = useState(typstInitStatus);
   const [showFontModal, setShowFontModal] = useState(false);
   const { t } = useTranslation();
 
@@ -37,6 +37,15 @@ const TypstInitStatusProvider: FC<{ children: ReactNode }> = ({ children }) => {
   return (
     <>
       {children}
+      {status === "pending" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/80 backdrop-blur-sm">
+          <div className="text-center">
+            <span className="loading loading-spinner loading-lg text-primary"></span>
+            <p className="mt-4 text-gray-600">{t('messages:initializingTypst') || 'Initializing Typst compiler...'}</p>
+            <p className="mt-2 text-sm text-gray-400">{t('messages:downloadingCompiler') || 'Downloading compiler and fonts'}</p>
+          </div>
+        </div>
+      )}
       {showFontModal && (
         <div className="modal modal-open">
           <div className="modal-box">

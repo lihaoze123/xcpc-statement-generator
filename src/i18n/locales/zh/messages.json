@@ -23,5 +23,7 @@
   "downloadCompiler": "下载编译器",
   "downloadFont": "下载字体",
   "requestFontAccess": "请求访问本机字体",
-  "fontAccessDescription": "允许访问本机字体可减少下载量。"
+  "fontAccessDescription": "允许访问本机字体可减少下载量。",
+  "initializingTypst": "正在初始化 Typst 编译器...",
+  "downloadingCompiler": "正在下载编译器和字体"
 }
