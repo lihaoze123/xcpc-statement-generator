@@ -66,7 +66,7 @@ const ProblemItem: FC<ProblemItemProps> = ({
   };
 
   return (
-    <div ref={setNodeRef} style={style} className={`bg-white border border-gray-200 rounded-lg overflow-hidden ${isDragging ? 'opacity-50' : ''} problem-item`}>
+    <div ref={setNodeRef} style={style} className={`bg-white border border-gray-200 rounded-lg overflow-hidden ${isDragging ? 'opacity-50' : ''} problem-item ${isExpanded ? 'problem-item-expanded' : ''}`}>
       <div className="flex items-center justify-between px-3 py-2 bg-gray-50 problem-item-header">
         <div className="flex items-center gap-2">
           <button {...attributes} {...listeners} className="btn btn-ghost btn-xs cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600" title={t('editor:dragToReorder')}>
@@ -77,19 +77,19 @@ const ProblemItem: FC<ProblemItemProps> = ({
           </span>
         </div>
         <div className="flex items-center gap-1">
-          <button className="btn btn-ghost btn-xs text-gray-400 hover:text-red-500" onClick={onDelete} title={t('editor:deleteProblem')}>
+          <button className="btn btn-ghost btn-xs text-gray-400 hover:text-red-500 transition-colors" onClick={onDelete} title={t('editor:deleteProblem')}>
             <FontAwesomeIcon icon={faTrash} />
           </button>
-          <button className="btn btn-ghost btn-xs text-gray-400 hover:text-gray-600" onClick={() => onToggleExpand(problem.key!)} title={isExpanded ? t('editor:collapse') : t('editor:expand')}>
+          <button className="btn btn-ghost btn-xs text-gray-400 hover:text-gray-600 transition-colors" onClick={() => onToggleExpand(problem.key!)} title={isExpanded ? t('editor:collapse') : t('editor:expand')}>
             <FontAwesomeIcon icon={isExpanded ? faChevronUp : faChevronDown} />
           </button>
         </div>
       </div>
       {isExpanded && (
-        <div className="bg-white p-4 space-y-5 problem-item-content">
+        <div className="bg-gray-50 p-4 space-y-5 problem-item-content">
           <div className="form-control">
             <label className="label py-1">
-              <span className="label-text text-sm font-medium text-gray-600">{t('editor:format')}</span>
+              <span className="form-label">{t('editor:format')}</span>
             </label>
             <select
               className="form-select select-sm w-full"
@@ -103,11 +103,11 @@ const ProblemItem: FC<ProblemItemProps> = ({
           </div>
           <div className="form-control">
             <label className="label py-1">
-              <span className="label-text text-sm font-medium text-gray-600">{t('editor:problemName')}</span>
+              <span className="form-label">{t('editor:problemName')}</span>
             </label>
             <input
               type="text"
-              className="form-input input-sm w-full"
+              className="form-input w-full"
               placeholder={t('editor:problemName')}
               value={problem.problem.display_name}
               onChange={(e) => onUpdate((p) => { p.problem.display_name = e.target.value; })}
@@ -115,127 +115,151 @@ const ProblemItem: FC<ProblemItemProps> = ({
           </div>
           <div className="form-control">
             <label className="label py-1">
-              <span className="label-text text-sm font-medium text-gray-600">{t('editor:problemDescription')}</span>
+              <span className="form-label">{t('editor:problemDescription')}</span>
             </label>
-            <Editor
-              height="150px"
-              language={problem.problem.format === "markdown" ? "markdown" : problem.problem.format === "typst" ? "plaintext" : "latex"}
-              value={problem.statement.description}
-              onChange={(value) => onUpdate((p) => { p.statement.description = value || ""; })}
-              options={{
-                minimap: { enabled: false },
-                fontSize: 12,
-                lineNumbers: "off",
-                scrollBeyondLastLine: false,
-                wordWrap: "on",
-                wrappingIndent: "same",
-              }}
-              theme="vs-light"
-            />
+            <div className="editor-container">
+              <Editor
+                height="150px"
+                language={problem.problem.format === "markdown" ? "markdown" : problem.problem.format === "typst" ? "plaintext" : "latex"}
+                value={problem.statement.description}
+                onChange={(value) => onUpdate((p) => { p.statement.description = value || ""; })}
+                options={{
+                  minimap: { enabled: false },
+                  fontSize: 13,
+                  lineNumbers: "off",
+                  scrollBeyondLastLine: false,
+                  wordWrap: "on",
+                  wrappingIndent: "same",
+                }}
+                theme="vs-light"
+              />
+            </div>
           </div>
-          <div>
-            <div className="text-sm font-medium text-gray-600 mb-1">{t('editor:inputFormat')}</div>
-            <Editor
-              height="100px"
-              language={problem.problem.format === "markdown" ? "markdown" : problem.problem.format === "typst" ? "plaintext" : "latex"}
-              value={problem.statement.input || ""}
-              onChange={(value) => onUpdate((p) => { p.statement.input = value || ""; })}
-              options={{
-                minimap: { enabled: false },
-                fontSize: 12,
-                lineNumbers: "off",
-                scrollBeyondLastLine: false,
-                wordWrap: "on",
-                wrappingIndent: "same",
-              }}
-              theme="vs-light"
-            />
+          <div className="form-control">
+            <label className="label py-1">
+              <span className="form-label">{t('editor:inputFormat')}</span>
+            </label>
+            <div className="editor-container">
+              <Editor
+                height="100px"
+                language={problem.problem.format === "markdown" ? "markdown" : problem.problem.format === "typst" ? "plaintext" : "latex"}
+                value={problem.statement.input || ""}
+                onChange={(value) => onUpdate((p) => { p.statement.input = value || ""; })}
+                options={{
+                  minimap: { enabled: false },
+                  fontSize: 13,
+                  lineNumbers: "off",
+                  scrollBeyondLastLine: false,
+                  wordWrap: "on",
+                  wrappingIndent: "same",
+                }}
+                theme="vs-light"
+              />
+            </div>
           </div>
-          <div>
-            <div className="text-sm font-medium text-gray-600 mb-1">{t('editor:outputFormat')}</div>
-            <Editor
-              height="100px"
-              language={problem.problem.format === "markdown" ? "markdown" : problem.problem.format === "typst" ? "plaintext" : "latex"}
-              value={problem.statement.output || ""}
-              onChange={(value) => onUpdate((p) => { p.statement.output = value || ""; })}
-              options={{
-                minimap: { enabled: false },
-                fontSize: 12,
-                lineNumbers: "off",
-                scrollBeyondLastLine: false,
-                wordWrap: "on",
-                wrappingIndent: "same",
-              }}
-              theme="vs-light"
-            />
+          <div className="form-control">
+            <label className="label py-1">
+              <span className="form-label">{t('editor:outputFormat')}</span>
+            </label>
+            <div className="editor-container">
+              <Editor
+                height="100px"
+                language={problem.problem.format === "markdown" ? "markdown" : problem.problem.format === "typst" ? "plaintext" : "latex"}
+                value={problem.statement.output || ""}
+                onChange={(value) => onUpdate((p) => { p.statement.output = value || ""; })}
+                options={{
+                  minimap: { enabled: false },
+                  fontSize: 13,
+                  lineNumbers: "off",
+                  scrollBeyondLastLine: false,
+                  wordWrap: "on",
+                  wrappingIndent: "same",
+                }}
+                theme="vs-light"
+              />
+            </div>
           </div>
-          <div>
-            <div className="text-sm font-medium text-gray-600 mb-1">{t('editor:hints')}</div>
-            <Editor
-              height="100px"
-              language={problem.problem.format === "markdown" ? "markdown" : problem.problem.format === "typst" ? "plaintext" : "latex"}
-              value={problem.statement.notes || ""}
-              onChange={(value) => onUpdate((p) => { p.statement.notes = value || ""; })}
-              options={{
-                minimap: { enabled: false },
-                fontSize: 12,
-                lineNumbers: "off",
-                scrollBeyondLastLine: false,
-                wordWrap: "on",
-                wrappingIndent: "same",
-              }}
-              theme="vs-light"
-            />
+          <div className="form-control">
+            <label className="label py-1">
+              <span className="form-label">{t('editor:hints')}</span>
+            </label>
+            <div className="editor-container">
+              <Editor
+                height="100px"
+                language={problem.problem.format === "markdown" ? "markdown" : problem.problem.format === "typst" ? "plaintext" : "latex"}
+                value={problem.statement.notes || ""}
+                onChange={(value) => onUpdate((p) => { p.statement.notes = value || ""; })}
+                options={{
+                  minimap: { enabled: false },
+                  fontSize: 13,
+                  lineNumbers: "off",
+                  scrollBeyondLastLine: false,
+                  wordWrap: "on",
+                  wrappingIndent: "same",
+                }}
+                theme="vs-light"
+              />
+            </div>
           </div>
 
-          <div className="text-sm font-medium text-gray-600">{t('editor:sampleInputOutput')}</div>
+          <div className="form-label">{t('editor:sampleInputOutput')}</div>
           {problem.problem.samples.map((sample, sIdx) => (
-            <div key={sIdx} className="mb-2">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-xs">{t('editor:sampleNumber', { number: sIdx + 1 })}</span>
+            <div key={sIdx} className="sample-item">
+              <div className="sample-header">
+                <span className="sample-number">{t('editor:sampleNumber', { number: sIdx + 1 })}</span>
                 {problem.problem.samples.length > 1 && (
                   <button
-                    className="btn btn-ghost btn-xs text-error"
+                    className="btn btn-ghost btn-xs text-gray-400 hover:text-red-500 transition-colors sample-delete-btn"
                     onClick={() => onUpdate((p) => { p.problem.samples.splice(sIdx, 1); })}
                   >
                     <FontAwesomeIcon icon={faTrash} />
                   </button>
                 )}
               </div>
-              <div className="text-xs text-gray-500 mb-0.5">{t('editor:input')}</div>
-              <Editor
-                height="60px"
-                language="plaintext"
-                value={sample.input}
-                onChange={(value) => onUpdate((p) => { p.problem.samples[sIdx].input = value || ""; })}
-                options={{
-                  minimap: { enabled: false },
-                  fontSize: 12,
-                  lineNumbers: "off",
-                  scrollBeyondLastLine: false,
-                  wordWrap: "off",
-                  wrappingIndent: "same",
-                  fontFamily: "monospace",
-                }}
-                theme="vs-light"
-              />
-              <div className="text-xs text-gray-500 mb-0.5 mt-1">{t('editor:output')}</div>
-              <Editor
-                height="60px"
-                language="plaintext"
-                value={sample.output}
-                onChange={(value) => onUpdate((p) => { p.problem.samples[sIdx].output = value || ""; })}
-                options={{
-                  minimap: { enabled: false },
-                  fontSize: 12,
-                  lineNumbers: "off",
-                  scrollBeyondLastLine: false,
-                  wordWrap: "off",
-                  wrappingIndent: "same",
-                  fontFamily: "monospace",
-                }}
-                theme="vs-light"
-              />
+              <div className="sample-grid">
+                <div className="sample-field">
+                  <label className="sample-field-label">{t('editor:input')}</label>
+                  <div className="editor-container editor-container-mono">
+                    <Editor
+                      height="80px"
+                      language="plaintext"
+                      value={sample.input}
+                      onChange={(value) => onUpdate((p) => { p.problem.samples[sIdx].input = value || ""; })}
+                      options={{
+                        minimap: { enabled: false },
+                        fontSize: 12,
+                        lineNumbers: "off",
+                        scrollBeyondLastLine: false,
+                        wordWrap: "off",
+                        wrappingIndent: "same",
+                        fontFamily: "Consolas, Monaco, 'Andale Mono', monospace",
+                      }}
+                      theme="vs-light"
+                    />
+                  </div>
+                </div>
+                <div className="sample-field">
+                  <label className="sample-field-label">{t('editor:output')}</label>
+                  <div className="editor-container editor-container-mono">
+                    <Editor
+                      height="80px"
+                      language="plaintext"
+                      value={sample.output}
+                      onChange={(value) => onUpdate((p) => { p.problem.samples[sIdx].output = value || ""; })}
+                      options={{
+                        minimap: { enabled: false },
+                        fontSize: 12,
+                        lineNumbers: "off",
+                        scrollBeyondLastLine: false,
+                        wordWrap: "off",
+                        wrappingIndent: "same",
+                        fontFamily: "Consolas, Monaco, 'Andale Mono', monospace",
+                      }}
+                      theme="vs-light"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
           ))}
           <button
