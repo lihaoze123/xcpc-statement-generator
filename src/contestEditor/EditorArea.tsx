@@ -11,6 +11,7 @@ interface EditorAreaProps {
   contestData: ContestWithImages;
   updateContestData: (update: (draft: ContestWithImages) => void) => void;
   activeId: string;
+  onDeleteProblem: (key: string) => void;
 }
 
 interface ConfigFormProps {
@@ -256,7 +257,8 @@ const SingleProblemEditor: FC<{
   problem: Problem;
   index: number;
   onUpdate: (updater: (p: Problem) => void) => void;
-}> = ({ problem, index, onUpdate }) => {
+  onDelete: () => void;
+}> = ({ problem, index, onUpdate, onDelete }) => {
   const { t } = useTranslation();
   const lang = problem.problem.format === "markdown" ? "markdown" : problem.problem.format === "typst" ? "plaintext" : "latex";
 
@@ -266,15 +268,24 @@ const SingleProblemEditor: FC<{
         <h2 className="text-xl font-semibold text-gray-800">
           {String.fromCharCode(65 + index)}. {problem.problem.display_name}
         </h2>
-        <select
-          className="select select-bordered select-sm w-32"
-          value={problem.problem.format || "latex"}
-          onChange={(e) => onUpdate((p) => { p.problem.format = e.target.value as ProblemFormat; })}
-        >
-          <option value="latex">LaTeX</option>
-          <option value="markdown">Markdown</option>
-          <option value="typst">Typst</option>
-        </select>
+        <div className="flex items-center gap-2">
+          <select
+            className="select select-bordered select-sm w-32"
+            value={problem.problem.format || "latex"}
+            onChange={(e) => onUpdate((p) => { p.problem.format = e.target.value as ProblemFormat; })}
+          >
+            <option value="latex">LaTeX</option>
+            <option value="markdown">Markdown</option>
+            <option value="typst">Typst</option>
+          </select>
+          <button
+            className="btn btn-sm btn-ghost text-red-500"
+            onClick={onDelete}
+            title={t('common:delete')}
+          >
+            <FontAwesomeIcon icon={faTrash} />
+          </button>
+        </div>
       </div>
 
       <div className="space-y-5 max-w-3xl">
@@ -386,7 +397,7 @@ const SingleProblemEditor: FC<{
   );
 };
 
-const EditorArea: FC<EditorAreaProps> = ({ contestData, updateContestData, activeId }) => {
+const EditorArea: FC<EditorAreaProps> = ({ contestData, updateContestData, activeId, onDeleteProblem }) => {
   if (activeId === 'config') {
     return (
       <div className="h-full overflow-y-auto bg-white custom-scroll">
@@ -412,6 +423,7 @@ const EditorArea: FC<EditorAreaProps> = ({ contestData, updateContestData, activ
           problem={problem}
           index={problemIndex}
           onUpdate={(updater) => updateContestData((draft) => updater(draft.problems[problemIndex]))}
+          onDelete={() => onDeleteProblem(problem.key!)}
         />
       </div>
     );

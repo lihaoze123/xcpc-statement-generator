@@ -304,6 +304,7 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
                 contestData={contestData}
                 updateContestData={updateContestData}
                 activeId={activeId}
+                onDeleteProblem={handleDeleteProblem}
               />
             </Allotment.Pane>
 

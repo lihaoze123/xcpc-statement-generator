@@ -24,9 +24,7 @@ const ProblemItem: FC<{
   index: number;
   isActive: boolean;
   onClick: () => void;
-  onDelete: () => void;
-}> = ({ problem, index, isActive, onClick, onDelete }) => {
-  const [showMenu, setShowMenu] = useState(false);
+}> = ({ problem, index, isActive, onClick }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: problem.key! });
 
   const style = {
@@ -35,13 +33,8 @@ const ProblemItem: FC<{
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const handleContextMenu = (e: React.MouseEvent) => {
-    e.preventDefault();
-    setShowMenu(true);
-  };
-
   return (
-    <div className="relative z-0">
+    <div className="relative">
       <div
         ref={setNodeRef}
         style={style}
@@ -56,33 +49,10 @@ const ProblemItem: FC<{
           }
         `}
         onClick={onClick}
-        onContextMenu={handleContextMenu}
         title={`Problem ${String.fromCharCode(65 + index)}: ${problem.problem.display_name}`}
       >
         {String.fromCharCode(65 + index)}
       </div>
-      {/* Context Menu */}
-      {showMenu && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
-          <div className="fixed left-14 top-2 z-50 bg-white rounded-lg shadow-xl border border-gray-200 py-1 min-w-[120px]">
-            <button
-              className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
-              onClick={() => { onClick(); setShowMenu(false); }}
-            >
-              <FontAwesomeIcon icon={faEdit} className="w-4" />
-              <span>编辑</span>
-            </button>
-            <button
-              className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2 text-red-500"
-              onClick={() => { onDelete(); setShowMenu(false); }}
-            >
-              <FontAwesomeIcon icon={faTrash} className="w-4" />
-              <span>删除</span>
-            </button>
-          </div>
-        </>
-      )}
     </div>
   );
 };
@@ -99,6 +69,19 @@ const Sidebar: FC<SidebarProps> = ({
   onOpenImages,
 }) => {
   const { t } = useTranslation();
+  const [menuState, setMenuState] = useState<{ open: boolean; x: number; y: number; problemKey: string }>({
+    open: false,
+    x: 0,
+    y: 0,
+    problemKey: "",
+  });
+
+  const handleContextMenu = (e: React.MouseEvent, problemKey: string) => {
+    e.preventDefault();
+    setMenuState({ open: true, x: e.clientX, y: e.clientY, problemKey });
+  };
+
+  const closeMenu = () => setMenuState((s) => ({ ...s, open: false }));
 
   return (
     <div className="flex flex-col h-full bg-white">
@@ -122,14 +105,14 @@ const Sidebar: FC<SidebarProps> = ({
         <SortableContext items={contestData.problems.map((p) => p.key!)} strategy={verticalListSortingStrategy}>
           <div className="flex flex-col">
             {contestData.problems.map((problem, index) => (
-              <ProblemItem
-                key={problem.key}
-                problem={problem}
-                index={index}
-                isActive={activeId === problem.key}
-                onClick={() => setActiveId(problem.key!)}
-                onDelete={() => onDeleteProblem(problem.key!)}
-              />
+              <div key={problem.key} onContextMenu={(e) => handleContextMenu(e, problem.key!)}>
+                <ProblemItem
+                  problem={problem}
+                  index={index}
+                  isActive={activeId === problem.key}
+                  onClick={() => { setActiveId(problem.key!); closeMenu(); }}
+                />
+              </div>
             ))}
           </div>
         </SortableContext>
@@ -171,6 +154,32 @@ const Sidebar: FC<SidebarProps> = ({
           <FontAwesomeIcon icon={faGear} className="text-lg" />
         </button>
       </div>
+
+      {/* Context Menu */}
+      {menuState.open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={closeMenu} />
+          <div
+            className="fixed z-50 bg-white rounded-lg shadow-xl border border-gray-200 py-1 min-w-[120px]"
+            style={{ left: menuState.x, top: menuState.y }}
+          >
+            <button
+              className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+              onClick={() => { setActiveId(menuState.problemKey); closeMenu(); }}
+            >
+              <FontAwesomeIcon icon={faEdit} className="w-4" />
+              <span>编辑</span>
+            </button>
+            <button
+              className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2 text-red-500"
+              onClick={() => { onDeleteProblem(menuState.problemKey); closeMenu(); }}
+            >
+              <FontAwesomeIcon icon={faTrash} className="w-4" />
+              <span>删除</span>
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 };
