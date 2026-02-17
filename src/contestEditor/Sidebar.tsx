@@ -1,6 +1,6 @@
-import type { FC } from "react";
+import { type FC, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faGear, faPlus, faFilePdf, faPenToSquare, faImages } from "@fortawesome/free-solid-svg-icons";
+import { faGear, faPlus, faFilePdf, faPenToSquare, faImages, faTrash, faEdit } from "@fortawesome/free-solid-svg-icons";
 import { useTranslation } from "react-i18next";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -24,7 +24,9 @@ const ProblemItem: FC<{
   index: number;
   isActive: boolean;
   onClick: () => void;
-}> = ({ problem, index, isActive, onClick }) => {
+  onDelete: () => void;
+}> = ({ problem, index, isActive, onClick, onDelete }) => {
+  const [showMenu, setShowMenu] = useState(false);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: problem.key! });
 
   const style = {
@@ -33,24 +35,54 @@ const ProblemItem: FC<{
     opacity: isDragging ? 0.5 : 1,
   };
 
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setShowMenu(true);
+  };
+
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...listeners}
-      className={`
-        flex items-center justify-center w-10 h-10 mx-auto my-0.5 rounded-md cursor-grab active:cursor-grabbing
-        transition-all duration-150 text-sm font-medium select-none border-2
-        ${isActive
-          ? 'border-[#1D71B7] text-[#1D71B7]'
-          : 'border-transparent text-gray-400 hover:bg-gray-100 hover:text-gray-600'
-        }
-      `}
-      onClick={onClick}
-      title={`Problem ${String.fromCharCode(65 + index)}: ${problem.problem.display_name}`}
-    >
-      {String.fromCharCode(65 + index)}
+    <div className="relative">
+      <div
+        ref={setNodeRef}
+        style={style}
+        {...attributes}
+        {...listeners}
+        className={`
+          flex items-center justify-center w-10 h-10 mx-auto my-0.5 rounded-md cursor-grab active:cursor-grabbing
+          transition-all duration-150 text-sm font-medium select-none border-2
+          ${isActive
+            ? 'border-[#1D71B7] text-[#1D71B7]'
+            : 'border-transparent text-gray-400 hover:bg-gray-100 hover:text-gray-600'
+          }
+        `}
+        onClick={onClick}
+        onContextMenu={handleContextMenu}
+        title={`Problem ${String.fromCharCode(65 + index)}: ${problem.problem.display_name}`}
+      >
+        {String.fromCharCode(65 + index)}
+      </div>
+      {/* Context Menu */}
+      {showMenu && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
+          <div className="absolute left-12 top-0 z-50 bg-white rounded-lg shadow-xl border border-gray-200 py-1 min-w-[120px]">
+            <button
+              className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+              onClick={() => { onClick(); setShowMenu(false); }}
+            >
+              <FontAwesomeIcon icon={faEdit} className="w-4" />
+              <span>编辑</span>
+            </button>
+            <button
+              className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2 text-red-500"
+              onClick={() => { onDelete(); setShowMenu(false); }}
+            >
+              <FontAwesomeIcon icon={faTrash} className="w-4" />
+              <span>删除</span>
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 };
@@ -60,6 +92,7 @@ const Sidebar: FC<SidebarProps> = ({
   activeId,
   setActiveId,
   onAddProblem,
+  onDeleteProblem,
   onExportPdf,
   exportDisabled,
   onOpenSettings,
@@ -95,6 +128,7 @@ const Sidebar: FC<SidebarProps> = ({
                 index={index}
                 isActive={activeId === problem.key}
                 onClick={() => setActiveId(problem.key!)}
+                onDelete={() => onDeleteProblem(problem.key!)}
               />
             ))}
           </div>
