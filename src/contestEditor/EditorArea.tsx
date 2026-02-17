@@ -279,7 +279,7 @@ const SingleProblemEditor: FC<{
             <option value="typst">Typst</option>
           </select>
           <button
-            className="btn btn-sm btn-ghost text-red-500"
+            className="btn btn-sm btn-ghost text-gray-400 hover:text-red-500"
             onClick={onDelete}
             title={t('common:delete')}
           >

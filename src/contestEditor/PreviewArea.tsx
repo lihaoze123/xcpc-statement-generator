@@ -12,7 +12,7 @@ interface PreviewAreaProps {
 }
 
 const PreviewArea: FC<PreviewAreaProps> = ({ data, previewRef, isFullscreen, setFullscreen }) => {
-  const [zoom, setZoom] = useState(100);
+  const [zoom, setZoom] = useState(75);
   const [pageInfo, setPageInfo] = useState<PreviewPageInfo>({ currentPage: 1, totalPages: 1 });
   const [pageInput, setPageInput] = useState("1");
 
