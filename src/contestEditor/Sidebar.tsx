@@ -28,7 +28,7 @@ const ProblemItem: FC<{
     <div
       className={`
         flex items-center justify-center w-10 h-10 mx-auto my-0.5 rounded-md cursor-grab
-        transition-all duration-150 text-sm font-medium
+        transition-all duration-150 text-sm font-medium select-none
         ${isActive
           ? 'bg-blue-50 text-[#1D71B7] border-l-3 border-[#1D71B7]'
           : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
@@ -59,7 +59,7 @@ const Sidebar: FC<SidebarProps> = ({
       {/* Top: Contest Config */}
       <div className="flex justify-center py-2 border-b border-gray-100">
         <button
-          className={`w-10 h-10 rounded-md flex items-center justify-center transition-colors ${
+          className={`w-10 h-10 rounded-md flex items-center justify-center transition-colors select-none ${
             activeId === 'config'
               ? 'bg-blue-50 text-[#1D71B7] border-l-3 border-[#1D71B7]'
               : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
@@ -90,11 +90,11 @@ const Sidebar: FC<SidebarProps> = ({
         {/* Add Problem */}
         <div className="flex justify-center py-2 mt-1">
           <button
-            className="w-10 h-10 rounded-md flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-[#1D71B7] transition-colors"
+            className="w-10 h-10 rounded-md flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-[#1D71B7] transition-colors select-none"
             onClick={onAddProblem}
             title={t('editor:addProblem')}
           >
-            <FontAwesomeIcon icon={faPlus} className="text-lg" />
+            <FontAwesomeIcon icon={faPlus} className="text-base" />
           </button>
         </div>
       </div>
@@ -102,7 +102,7 @@ const Sidebar: FC<SidebarProps> = ({
       {/* Bottom: Actions */}
       <div className="flex flex-col items-center gap-1 py-2 border-t border-gray-100">
         <button
-          className="w-10 h-10 rounded-md flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors disabled:opacity-50"
+          className="w-10 h-10 rounded-md flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors disabled:opacity-50 select-none"
           onClick={onExportPdf}
           disabled={exportDisabled}
           title={t('common:exportPdf')}
@@ -110,14 +110,14 @@ const Sidebar: FC<SidebarProps> = ({
           <FontAwesomeIcon icon={faFilePdf} className="text-lg" />
         </button>
         <button
-          className="w-10 h-10 rounded-md flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+          className="w-10 h-10 rounded-md flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors select-none"
           onClick={onOpenImages}
           title={t('editor:imageManagement')}
         >
           <FontAwesomeIcon icon={faImages} className="text-lg" />
         </button>
         <button
-          className="w-10 h-10 rounded-md flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+          className="w-10 h-10 rounded-md flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors select-none"
           onClick={onOpenSettings}
           title={t('common:settings')}
         >
