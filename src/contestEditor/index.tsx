@@ -1,7 +1,19 @@
-import { type FC, useEffect, useState, useMemo, Suspense, use } from "react";
+import { type FC, useEffect, useState, useMemo, Suspense, use, useRef, useCallback } from "react";
 import { useImmer } from "use-immer";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFileArrowDown, faFileImport, faFileExport, faChevronDown, faFolderOpen, faExpand, faCompress, faMagnifyingGlassPlus, faMagnifyingGlassMinus } from "@fortawesome/free-solid-svg-icons";
+import {
+  faFileArrowDown,
+  faFileImport,
+  faFileExport,
+  faChevronDown,
+  faChevronLeft,
+  faChevronRight,
+  faFolderOpen,
+  faExpand,
+  faCompress,
+  faMagnifyingGlassPlus,
+  faMagnifyingGlassMinus
+} from "@fortawesome/free-solid-svg-icons";
 import { debounce } from "lodash";
 import { useTranslation } from "react-i18next";
 import { Allotment } from "allotment";
@@ -14,7 +26,7 @@ import { saveConfigToDB, loadConfigFromDB, exportConfig, importConfig, clearDB, 
 import { loadPolygonPackage } from "@/utils/polygonConverter";
 import { useToast } from "@/components/ToastProvider";
 import ConfigPanel from "./ConfigPanel";
-import Preview from "./Preview";
+import Preview, { type PreviewHandle, type PreviewPageInfo } from "./Preview";
 
 import "./index.css";
 
@@ -26,8 +38,54 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
   const [confirmModalContent, setConfirmModalContent] = useState({ title: '', content: '' });
   const [previewFullscreen, setPreviewFullscreen] = useState(false);
   const [previewZoom, setPreviewZoom] = useState(100);
+  const [previewPageInfo, setPreviewPageInfo] = useState<PreviewPageInfo>({ currentPage: 1, totalPages: 1 });
+  const [previewPageInput, setPreviewPageInput] = useState("1");
+  const [isPageInputFocused, setIsPageInputFocused] = useState(false);
+  const previewRef = useRef<PreviewHandle>(null);
   const { t } = useTranslation();
   const { showToast } = useToast();
+  const totalPages = Math.max(1, previewPageInfo.totalPages);
+
+  const handlePreviewPageInfoChange = useCallback((info: PreviewPageInfo) => {
+    setPreviewPageInfo((prev) => {
+      if (prev.currentPage === info.currentPage && prev.totalPages === info.totalPages) {
+        return prev;
+      }
+      return info;
+    });
+    if (!isPageInputFocused) {
+      setPreviewPageInput(String(info.currentPage));
+    }
+  }, [isPageInputFocused]);
+
+  const handleJumpToPage = useCallback(() => {
+    const parsed = Number(previewPageInput);
+    const total = Math.max(1, previewPageInfo.totalPages);
+    const current = Math.max(1, previewPageInfo.currentPage);
+
+    if (!Number.isFinite(parsed)) {
+      setPreviewPageInput(String(current));
+      return;
+    }
+
+    const target = Math.min(total, Math.max(1, Math.trunc(parsed)));
+    setPreviewPageInput(String(target));
+    previewRef.current?.jumpToPage(target);
+  }, [previewPageInfo.currentPage, previewPageInfo.totalPages, previewPageInput]);
+
+  const handlePrevPage = useCallback(() => {
+    if (previewPageInfo.currentPage <= 1) return;
+    const target = previewPageInfo.currentPage - 1;
+    setPreviewPageInput(String(target));
+    previewRef.current?.jumpToPage(target);
+  }, [previewPageInfo.currentPage]);
+
+  const handleNextPage = useCallback(() => {
+    if (previewPageInfo.currentPage >= totalPages) return;
+    const target = previewPageInfo.currentPage + 1;
+    setPreviewPageInput(String(target));
+    previewRef.current?.jumpToPage(target);
+  }, [previewPageInfo.currentPage, totalPages]);
 
   // Debounced auto-save
   const debouncedSave = useMemo(() =>
@@ -216,77 +274,137 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
   return (
     <div className="contest-editor flex flex-col h-full">
       {/* Top Toolbar */}
-      <div className="flex items-center gap-1 px-4 py-2 bg-white border-b border-gray-200">
-        {/* Group A: Config/Data */}
-        <div className="dropdown">
-          <button tabIndex={0} className="btn-ghost">
-            {t('common:loadExample')} <FontAwesomeIcon icon={faChevronDown} className="ml-1" />
+      <div className="editor-toolbar">
+        <div className="editor-toolbar-left custom-scroll">
+          {/* Group A: Config/Data */}
+          <div className="dropdown">
+            <button tabIndex={0} className="btn-ghost whitespace-nowrap toolbar-action-btn">
+              <span className="toolbar-btn-label">{t('common:loadExample')}</span>
+              <FontAwesomeIcon icon={faChevronDown} className="ml-1 text-[10px]" />
+            </button>
+            <ul tabIndex={0} className="dropdown-content menu p-2 shadow-lg bg-white rounded-lg w-52 border border-gray-200">
+              {Object.keys(exampleStatements).map((k) => (
+                <li key={k}><a onClick={() => handleLoadExample(k)} className="text-sm">{k}</a></li>
+              ))}
+            </ul>
+          </div>
+          <button className="btn-ghost whitespace-nowrap toolbar-action-btn" onClick={handleImportPolygonPackage}>
+            <FontAwesomeIcon icon={faFolderOpen} className="mr-1.5 text-sm" />
+            <span className="toolbar-btn-label toolbar-btn-label-optional">{t('common:importPolygonPackage')}</span>
           </button>
-          <ul tabIndex={0} className="dropdown-content menu p-2 shadow-lg bg-white rounded-lg w-52 border border-gray-200">
-            {Object.keys(exampleStatements).map((k) => (
-              <li key={k}><a onClick={() => handleLoadExample(k)} className="text-sm">{k}</a></li>
-            ))}
-          </ul>
+          <button className="btn-ghost whitespace-nowrap toolbar-action-btn" onClick={handleImport}>
+            <FontAwesomeIcon icon={faFileImport} className="mr-1.5 text-sm" />
+            <span className="toolbar-btn-label toolbar-btn-label-optional">{t('common:importConfig')}</span>
+          </button>
+          <button className="btn-ghost whitespace-nowrap toolbar-action-btn" onClick={handleExport}>
+            <FontAwesomeIcon icon={faFileExport} className="mr-1.5 text-sm" />
+            <span className="toolbar-btn-label toolbar-btn-label-optional">{t('common:exportConfig')}</span>
+          </button>
         </div>
-        <button className="btn-ghost" onClick={handleImportPolygonPackage}>
-          <FontAwesomeIcon icon={faFolderOpen} className="mr-1.5 text-sm" />
-          {t('common:importPolygonPackage')}
-        </button>
-        <button className="btn-ghost" onClick={handleImport}>
-          <FontAwesomeIcon icon={faFileImport} className="mr-1.5 text-sm" />
-          {t('common:importConfig')}
-        </button>
-        <button className="btn-ghost" onClick={handleExport}>
-          <FontAwesomeIcon icon={faFileExport} className="mr-1.5 text-sm" />
-          {t('common:exportConfig')}
-        </button>
-
-        {/* Divider */}
-        <div className="w-px h-6 bg-gray-200 mx-2"></div>
 
         {/* Group B: View/Main Action */}
-        {previewFullscreen && (
-          <>
+        <div className="editor-toolbar-right">
+          {previewFullscreen && (
+            <div className="toolbar-pill">
+              <button
+                className="toolbar-icon-btn"
+                onClick={() => setPreviewZoom(Math.max(50, previewZoom - 10))}
+                title="Zoom Out"
+                aria-label="Zoom Out"
+              >
+                <FontAwesomeIcon icon={faMagnifyingGlassMinus} className="text-sm" />
+              </button>
+              <span className="toolbar-zoom-value">{previewZoom}%</span>
+              <button
+                className="toolbar-icon-btn"
+                onClick={() => setPreviewZoom(Math.min(200, previewZoom + 10))}
+                title="Zoom In"
+                aria-label="Zoom In"
+              >
+                <FontAwesomeIcon icon={faMagnifyingGlassPlus} className="text-sm" />
+              </button>
+            </div>
+          )}
+
+          <button
+            className="btn-ghost whitespace-nowrap toolbar-fullscreen-btn toolbar-action-btn"
+            onClick={() => setPreviewFullscreen(!previewFullscreen)}
+            title={previewFullscreen ? t('common:exitFullscreen') : t('common:fullscreen')}
+          >
+            <FontAwesomeIcon icon={previewFullscreen ? faCompress : faExpand} className="mr-1.5 text-sm" />
+            <span className="toolbar-fullscreen-label">
+              {previewFullscreen ? t('common:exitFullscreen') : t('common:fullscreen')}
+            </span>
+          </button>
+
+          <div className="toolbar-pager" role="group" aria-label={t('common:page')}>
             <button
-              className="btn-ghost"
-              onClick={() => setPreviewZoom(Math.max(50, previewZoom - 10))}
-              title="Zoom Out"
+              className="toolbar-pager-btn"
+              onClick={handlePrevPage}
+              disabled={previewPageInfo.currentPage <= 1}
+              title="Previous Page"
+              aria-label="Previous Page"
             >
-              <FontAwesomeIcon icon={faMagnifyingGlassMinus} className="text-sm" />
+              <FontAwesomeIcon icon={faChevronLeft} className="text-[11px]" />
             </button>
-            <span className="text-xs text-gray-500 min-w-[40px] text-center">{previewZoom}%</span>
+            <div className="toolbar-pager-center">
+              <input
+                type="number"
+                min={1}
+                max={totalPages}
+                className="toolbar-page-current-input"
+                value={previewPageInput}
+                onChange={(e) => setPreviewPageInput(e.target.value)}
+                onFocus={() => setIsPageInputFocused(true)}
+                onBlur={() => {
+                  setIsPageInputFocused(false);
+                  if (previewPageInput.trim() === "") {
+                    setPreviewPageInput(String(previewPageInfo.currentPage));
+                    return;
+                  }
+                  handleJumpToPage();
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleJumpToPage();
+                    (e.currentTarget as HTMLInputElement).blur();
+                  }
+                }}
+                aria-label={t('common:goToPage')}
+              />
+              <span className="toolbar-page-separator">/</span>
+              <span className="toolbar-page-total">{totalPages}</span>
+            </div>
             <button
-              className="btn-ghost"
-              onClick={() => setPreviewZoom(Math.min(200, previewZoom + 10))}
-              title="Zoom In"
+              className="toolbar-pager-btn"
+              onClick={handleNextPage}
+              disabled={previewPageInfo.currentPage >= totalPages}
+              title="Next Page"
+              aria-label="Next Page"
             >
-              <FontAwesomeIcon icon={faMagnifyingGlassPlus} className="text-sm" />
+              <FontAwesomeIcon icon={faChevronRight} className="text-[11px]" />
             </button>
-          </>
-        )}
-        <button
-          className="btn-ghost"
-          onClick={() => setPreviewFullscreen(!previewFullscreen)}
-          title={previewFullscreen ? t('common:exitFullscreen') : t('common:fullscreen')}
-        >
-          <FontAwesomeIcon icon={previewFullscreen ? faCompress : faExpand} className="mr-1.5 text-sm" />
-          {previewFullscreen ? t('common:exitFullscreen') : t('common:fullscreen')}
-        </button>
-        <button
-          className="btn-primary ml-1"
-          onClick={handleExportPdf}
-          disabled={exportDisabled}
-        >
-          <FontAwesomeIcon icon={faFileArrowDown} className="mr-1.5 text-sm" />
-          {t('common:exportPdf')}
-        </button>
+          </div>
+
+          <div className="toolbar-section-divider" aria-hidden="true"></div>
+
+          <button
+            className="btn-primary toolbar-primary-btn shadow-sm"
+            onClick={handleExportPdf}
+            disabled={exportDisabled}
+          >
+            <FontAwesomeIcon icon={faFileArrowDown} className="mr-1.5 text-sm" />
+            <span className="toolbar-primary-label">{t('common:exportPdf')}</span>
+          </button>
+        </div>
       </div>
 
       {/* Main Content */}
       {previewFullscreen ? (
         <div className="flex-1 custom-scroll overflow-y-auto" style={{ backgroundColor: '#F3F4F6', padding: '24px' }}>
           <div className="a4-paper min-h-[297mm] p-8 transition-transform duration-200" style={{ transform: `scale(${previewZoom / 100})`, transformOrigin: 'top center' }}>
-            <Preview data={contestData} />
+            <Preview ref={previewRef} data={contestData} onPageInfoChange={handlePreviewPageInfoChange} />
           </div>
         </div>
       ) : (
@@ -299,7 +417,7 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
           <Allotment.Pane>
             <div className="custom-scroll h-full overflow-y-auto" style={{ backgroundColor: '#F3F4F6', padding: '24px' }}>
               <div className="a4-paper min-h-[297mm] p-8 transition-transform duration-200" style={{ transform: `scale(${previewZoom / 100})`, transformOrigin: 'top center' }}>
-                <Preview data={contestData} />
+                <Preview ref={previewRef} data={contestData} onPageInfoChange={handlePreviewPageInfoChange} />
               </div>
             </div>
           </Allotment.Pane>

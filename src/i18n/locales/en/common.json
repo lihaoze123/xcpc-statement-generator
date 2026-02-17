@@ -13,5 +13,8 @@
   "add": "Add",
   "delete": "Delete",
   "fullscreen": "Fullscreen",
-  "exitFullscreen": "Exit Fullscreen"
+  "exitFullscreen": "Exit Fullscreen",
+  "page": "Page",
+  "go": "Go",
+  "goToPage": "Go to page"
 }

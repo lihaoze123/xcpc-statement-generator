@@ -13,5 +13,8 @@
   "add": "添加",
   "delete": "删除",
   "fullscreen": "全屏",
-  "exitFullscreen": "退出全屏"
+  "exitFullscreen": "退出全屏",
+  "page": "页",
+  "go": "跳转",
+  "goToPage": "跳转到页码"
 }
