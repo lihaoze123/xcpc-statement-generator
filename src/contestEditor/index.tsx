@@ -8,7 +8,7 @@ import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type D
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { arrayMove } from "@dnd-kit/sortable";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFileCode, faLanguage, faUpload, faFileZipper, faX, faImages, faChevronDown } from "@fortawesome/free-solid-svg-icons";
+import { faFileCode, faLanguage, faUpload, faFileZipper, faX, faImages, faChevronDown, faArrowsDownToLine } from "@fortawesome/free-solid-svg-icons";
 
 import type { ContestWithImages, ImageData } from "@/types/contest";
 import { exampleStatements } from "./exampleStatements";
@@ -30,6 +30,7 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
   const [exportDisabled, setExportDisabled] = useState(true);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showReorder, setShowReorder] = useState(false);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const [confirmModalContent, setConfirmModalContent] = useState({ title: '', content: '' });
   const [previewFullscreen, setPreviewFullscreen] = useState(false);
@@ -362,6 +363,12 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
                   <span className="text-base">{t('editor:imageManagement')}</span>
                 </button>
 
+                {/* Reorder Problems */}
+                <button className="btn btn-outline btn-lg justify-start gap-4 h-14" onClick={() => setShowReorder(true)}>
+                  <FontAwesomeIcon icon={faArrowsDownToLine} className="text-xl w-6" />
+                  <span className="text-base">重排题目</span>
+                </button>
+
                 {/* Load Example - Dropdown */}
                 <div className="dropdown dropdown-bottom w-full">
                   <label tabIndex={0} className="btn btn-outline btn-lg justify-start gap-4 h-14 w-full">
@@ -401,6 +408,35 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
               </div>
             </div>
             <div className="modal-backdrop" onClick={() => setShowSettings(false)}></div>
+          </div>
+        )}
+
+        {/* Reorder Modal */}
+        {showReorder && (
+          <div className="modal modal-open">
+            <div className="modal-box max-w-sm">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="font-bold text-xl">重排题目</h3>
+                <button className="btn btn-sm btn-ghost" onClick={() => setShowReorder(false)}>
+                  <FontAwesomeIcon icon={faX} />
+                </button>
+              </div>
+              <div className="flex flex-col gap-2 max-h-[60vh] overflow-y-auto">
+                {contestData.problems.map((problem, index) => (
+                  <div
+                    key={problem.key}
+                    className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-grab active:cursor-grabbing"
+                  >
+                    <span className="w-6 h-6 flex items-center justify-center bg-white rounded border text-sm font-medium">
+                      {String.fromCharCode(65 + index)}
+                    </span>
+                    <span className="flex-1 truncate">{problem.problem.display_name}</span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-sm text-gray-500 mt-4 text-center">拖拽题目以重新排序</p>
+            </div>
+            <div className="modal-backdrop" onClick={() => setShowReorder(false)}></div>
           </div>
         )}
       </div>
