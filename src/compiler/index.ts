@@ -242,6 +242,9 @@ export const registerImages = async (images: ImageData[]): Promise<void> => {
 export const compileToPdf = (data: ContestWithImages): Promise<Uint8Array> =>
   sendMessage("compileTypst", data);
 
+export const compileProblemToPdf = (data: ContestWithImages, problemKey: string): Promise<Uint8Array> =>
+  sendMessage("compileProblem", { contest: data, problemKey });
+
 export const compileToSvg = (data: ContestWithImages): Promise<string> =>
   sendMessage("renderTypst", data);
 
