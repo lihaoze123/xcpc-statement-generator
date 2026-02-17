@@ -8,7 +8,7 @@ import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type D
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { arrayMove } from "@dnd-kit/sortable";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFileCode, faLanguage, faUpload, faFileZipper, faX } from "@fortawesome/free-solid-svg-icons";
+import { faFileCode, faLanguage, faUpload, faFileZipper, faX, faImages, faChevronDown } from "@fortawesome/free-solid-svg-icons";
 
 import type { ContestWithImages, ImageData } from "@/types/contest";
 import { exampleStatements } from "./exampleStatements";
@@ -291,6 +291,7 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
             onExportPdf={handleExportPdf}
             exportDisabled={exportDisabled}
             onOpenSettings={() => setShowSettings(true)}
+            onOpenImages={() => setActiveId('images')}
           />
         </div>
 
@@ -340,32 +341,61 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
         {/* Settings Modal */}
         {showSettings && (
           <div className="modal modal-open">
-            <div className="modal-box max-w-sm">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="font-bold text-lg">{t('common:settings')}</h3>
+            <div className="modal-box max-w-md">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="font-bold text-xl">{t('common:settings')}</h3>
                 <button className="btn btn-sm btn-ghost" onClick={() => setShowSettings(false)}>
                   <FontAwesomeIcon icon={faX} />
                 </button>
               </div>
-              <div className="flex flex-col gap-3">
-                <button className="btn btn-outline btn-sm justify-start gap-3" onClick={() => { setShowSettings(false); toggleLanguage(); }}>
-                  <FontAwesomeIcon icon={faLanguage} />
-                  <span>{i18n.language === "zh" ? "English" : "中文"}</span>
+              <div className="flex flex-col gap-4">
+                {/* Language Toggle */}
+                <button className="btn btn-outline btn-lg justify-start gap-4 h-14" onClick={() => { setShowSettings(false); toggleLanguage(); }}>
+                  <FontAwesomeIcon icon={faLanguage} className="text-xl w-6" />
+                  <span className="text-base">{i18n.language === "zh" ? "切换到英文" : "Switch to 中文"}</span>
                 </button>
-                <button className="btn btn-outline btn-sm justify-start gap-3" onClick={() => { setShowSettings(false); handleLoadExample("English Example"); }}>
-                  <span>{t('common:loadExample')}</span>
+
+                {/* Image Management */}
+                <button className="btn btn-outline btn-lg justify-start gap-4 h-14" onClick={() => { setShowSettings(false); setActiveId('images'); }}>
+                  <FontAwesomeIcon icon={faImages} className="text-xl w-6" />
+                  <span className="text-base">{t('editor:imageManagement')}</span>
                 </button>
-                <button className="btn btn-outline btn-sm justify-start gap-3" onClick={() => { setShowSettings(false); handleImportPolygonPackage(); }}>
-                  <FontAwesomeIcon icon={faFileZipper} />
-                  <span>{t('common:importPolygonPackage')}</span>
+
+                {/* Load Example - Dropdown */}
+                <div className="dropdown dropdown-bottom w-full">
+                  <label tabIndex={0} className="btn btn-outline btn-lg justify-start gap-4 h-14 w-full">
+                    <FontAwesomeIcon icon={faChevronDown} className="text-xl w-6" />
+                    <span className="text-base">{t('common:loadExample')}</span>
+                  </label>
+                  <ul tabIndex={0} className="dropdown-content menu p-2 shadow-xl bg-base-100 rounded-box w-full border border-base-300 mt-2">
+                    {Object.keys(exampleStatements).map((key) => (
+                      <li key={key}>
+                        <a onClick={() => { setShowSettings(false); handleLoadExample(key); }} className="text-base">
+                          {key}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="divider my-1">导入 / 导出</div>
+
+                {/* Import Polygon */}
+                <button className="btn btn-outline btn-lg justify-start gap-4 h-14" onClick={() => { setShowSettings(false); handleImportPolygonPackage(); }}>
+                  <FontAwesomeIcon icon={faFileZipper} className="text-xl w-6" />
+                  <span className="text-base">{t('common:importPolygonPackage')}</span>
                 </button>
-                <button className="btn btn-outline btn-sm justify-start gap-3" onClick={() => { setShowSettings(false); handleImport(); }}>
-                  <FontAwesomeIcon icon={faUpload} />
-                  <span>{t('common:importConfig')}</span>
+
+                {/* Import Config */}
+                <button className="btn btn-outline btn-lg justify-start gap-4 h-14" onClick={() => { setShowSettings(false); handleImport(); }}>
+                  <FontAwesomeIcon icon={faUpload} className="text-xl w-6" />
+                  <span className="text-base">{t('common:importConfig')}</span>
                 </button>
-                <button className="btn btn-outline btn-sm justify-start gap-3" onClick={() => { setShowSettings(false); handleExport(); }}>
-                  <FontAwesomeIcon icon={faFileCode} />
-                  <span>{t('common:exportConfig')}</span>
+
+                {/* Export Config */}
+                <button className="btn btn-outline btn-lg justify-start gap-4 h-14" onClick={() => { setShowSettings(false); handleExport(); }}>
+                  <FontAwesomeIcon icon={faFileCode} className="text-xl w-6" />
+                  <span className="text-base">{t('common:exportConfig')}</span>
                 </button>
               </div>
             </div>
