@@ -5,6 +5,7 @@
   "importConfig": "Import Config",
   "exportConfig": "Export Config",
   "exportPdf": "Export PDF",
+  "exportProblem": "Export Problem",
   "continue": "Continue",
   "cancel": "Cancel",
   "loading": "Loading...",

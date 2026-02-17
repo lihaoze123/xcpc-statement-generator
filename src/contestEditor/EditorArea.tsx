@@ -2,7 +2,7 @@ import { type FC, useState } from "react";
 import type { ContestWithImages, Problem, ProblemFormat, ImageData, AutoLanguageOption } from "@/types/contest";
 import { useTranslation } from "react-i18next";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTrash, faInbox, faCopy, faChevronDown } from "@fortawesome/free-solid-svg-icons";
+import { faTrash, faInbox, faCopy, faChevronDown, faFilePdf } from "@fortawesome/free-solid-svg-icons";
 import { saveImageToDB, deleteImageFromDB } from "@/utils/indexedDBUtils";
 import { useToast } from "@/components/ToastProvider";
 import TabBar, { type TabId } from "@/components/TabBar";
@@ -14,6 +14,7 @@ interface EditorAreaProps {
   updateContestData: (update: (draft: ContestWithImages) => void) => void;
   activeId: string;
   onDeleteProblem: (key: string) => void;
+  onExportCurrentProblem?: () => void;
   vimMode?: boolean;
 }
 
@@ -261,8 +262,9 @@ const SingleProblemEditor: FC<{
   index: number;
   onUpdate: (updater: (p: Problem) => void) => void;
   onDelete: () => void;
+  onExport?: () => void;
   vimMode?: boolean;
-}> = ({ problem, index, onUpdate, onDelete, vimMode = false }) => {
+}> = ({ problem, index, onUpdate, onDelete, onExport, vimMode = false }) => {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<TabId>("description");
 
@@ -335,6 +337,15 @@ const SingleProblemEditor: FC<{
           {String.fromCharCode(65 + index)}. {problem.problem.display_name}
         </h2>
         <div className="flex items-center gap-2">
+          {onExport && (
+            <button
+              className="btn btn-sm btn-ghost"
+              onClick={onExport}
+              title={t('common:exportProblem')}
+            >
+              <FontAwesomeIcon icon={faFilePdf} />
+            </button>
+          )}
           <select
             className="select select-bordered select-sm w-32"
             value={problem.problem.format || "latex"}
@@ -376,7 +387,7 @@ const SingleProblemEditor: FC<{
   );
 };
 
-const EditorArea: FC<EditorAreaProps> = ({ contestData, updateContestData, activeId, onDeleteProblem, vimMode = false }) => {
+const EditorArea: FC<EditorAreaProps> = ({ contestData, updateContestData, activeId, onDeleteProblem, onExportCurrentProblem, vimMode = false }) => {
   if (activeId === 'config') {
     return (
       <div className="h-full overflow-y-auto bg-white custom-scroll">
@@ -404,6 +415,7 @@ const EditorArea: FC<EditorAreaProps> = ({ contestData, updateContestData, activ
           index={problemIndex}
           onUpdate={(updater) => updateContestData((draft) => updater(draft.problems[problemIndex]))}
           onDelete={() => onDeleteProblem(problem.key!)}
+          onExport={onExportCurrentProblem}
           vimMode={vimMode}
         />
       </div>
