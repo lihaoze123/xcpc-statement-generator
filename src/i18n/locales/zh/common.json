@@ -5,6 +5,7 @@
   "importConfig": "导入配置",
   "exportConfig": "导出配置",
   "exportPdf": "导出 PDF",
+  "exportProblem": "导出题目",
   "continue": "继续",
   "cancel": "取消",
   "loading": "加载中...",

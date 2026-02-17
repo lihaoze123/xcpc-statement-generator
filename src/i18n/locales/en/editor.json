@@ -40,5 +40,7 @@
   "collapse": "Collapse",
   "dragToReorder": "Drag to reorder",
   "showPreview": "Show Preview",
-  "hidePreview": "Hide Preview"
+  "hidePreview": "Hide Preview",
+  "exportSuccess": "Problem exported successfully",
+  "exportFailed": "Problem export failed"
 }
