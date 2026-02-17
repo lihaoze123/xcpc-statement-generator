@@ -13,7 +13,7 @@ import { faFileCode, faLanguage, faUpload, faFileZipper, faX, faImages, faChevro
 
 import type { ContestWithImages, ImageData } from "@/types/contest";
 import { exampleStatements } from "./exampleStatements";
-import { compileToPdf, typstInitPromise, registerImages } from "@/compiler";
+import { compileToPdf, compileProblemToPdf, typstInitPromise, registerImages } from "@/compiler";
 import { saveConfigToDB, loadConfigFromDB, exportConfig, importConfig, clearDB, saveImageToDB } from "@/utils/indexedDBUtils";
 import { loadPolygonPackage } from "@/utils/polygonConverter";
 import { useToast } from "@/components/ToastProvider";
@@ -338,6 +338,27 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
             onAddProblem={handleAddProblem}
             onDeleteProblem={handleDeleteProblem}
             onExportPdf={handleExportPdf}
+            onExportProblem={(key) => {
+              const problem = contestData.problems.find(p => p.key === key);
+              if (!problem) return;
+
+              compileProblemToPdf(contestData, key)
+                .then(pdf => {
+                  const blob = new Blob([new Uint8Array(pdf)], { type: "application/pdf" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  const index = contestData.problems.findIndex(p => p.key === key);
+                  const letter = String.fromCharCode(65 + index);
+                  a.download = `${contestData.meta.title || "contest"}-${letter}.pdf`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                  showToast(t('editor:exportSuccess'), 'success');
+                })
+                .catch(err => {
+                  showToast(t('editor:exportFailed') + ': ' + (err instanceof Error ? err.message : String(err)), 'error');
+                });
+            }}
             exportDisabled={exportDisabled}
             onOpenSettings={() => setShowSettings(true)}
             onOpenImages={() => setActiveId('images')}

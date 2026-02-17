@@ -13,6 +13,7 @@ interface SidebarProps {
   onAddProblem: () => void;
   onDeleteProblem: (key: string) => void;
   onExportPdf: () => void;
+  onExportProblem?: (key: string) => void;
   exportDisabled: boolean;
   onOpenSettings: () => void;
   onOpenImages: () => void;
@@ -66,6 +67,7 @@ const Sidebar: FC<SidebarProps> = ({
   onAddProblem,
   onDeleteProblem,
   onExportPdf,
+  onExportProblem,
   exportDisabled,
   onOpenSettings,
   onOpenImages,
@@ -181,6 +183,15 @@ const Sidebar: FC<SidebarProps> = ({
               <FontAwesomeIcon icon={faEdit} className="w-4" />
               <span>编辑</span>
             </button>
+            {onExportProblem && (
+              <button
+                className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                onClick={() => { onExportProblem(menuState.problemKey); closeMenu(); }}
+              >
+                <FontAwesomeIcon icon={faFilePdf} className="w-4" />
+                <span>{t('common:exportProblem')}</span>
+              </button>
+            )}
             <button
               className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2 text-red-500"
               onClick={() => { onDeleteProblem(menuState.problemKey); closeMenu(); }}
