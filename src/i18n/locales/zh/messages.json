@@ -15,6 +15,10 @@
     "title": "载入示例配置",
     "content": "载入示例配置将覆盖当前所有配置，是否继续？"
   },
+  "deleteProblemConfirm": {
+    "title": "删除题目",
+    "content": "确定要删除此题吗？此操作无法撤销。"
+  },
   "parsingPolygonPackage": "正在解析 Polygon 比赛包...",
   "compilationError": "编译返回空数据",
   "typstInitializing": "Typst 正在初始化",

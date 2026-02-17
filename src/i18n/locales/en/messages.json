@@ -15,6 +15,10 @@
     "title": "Load Example Configuration",
     "content": "Loading example configuration will override all current configurations. Continue?"
   },
+  "deleteProblemConfirm": {
+    "title": "Delete Problem",
+    "content": "Are you sure you want to delete this problem? This action cannot be undone."
+  },
   "parsingPolygonPackage": "Parsing Polygon package...",
   "compilationError": "Compilation returned empty data",
   "typstInitializing": "Typst is initializing",

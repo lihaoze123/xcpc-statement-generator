@@ -1,5 +1,6 @@
 {
   "loadExample": "Load Example",
+  "settings": "Settings",
   "importPolygonPackage": "Import Polygon Package",
   "importConfig": "Import Config",
   "exportConfig": "Export Config",

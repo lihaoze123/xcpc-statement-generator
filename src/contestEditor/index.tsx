@@ -1,23 +1,12 @@
 import { type FC, useEffect, useState, useMemo, Suspense, use, useRef, useCallback } from "react";
 import { useImmer } from "use-immer";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  faFileArrowDown,
-  faFileImport,
-  faFileExport,
-  faChevronDown,
-  faChevronLeft,
-  faChevronRight,
-  faFolderOpen,
-  faExpand,
-  faCompress,
-  faMagnifyingGlassPlus,
-  faMagnifyingGlassMinus
-} from "@fortawesome/free-solid-svg-icons";
 import { debounce } from "lodash";
 import { useTranslation } from "react-i18next";
 import { Allotment } from "allotment";
 import "allotment/dist/style.css";
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
+import { arrayMove } from "@dnd-kit/sortable";
 
 import type { ContestWithImages, ImageData } from "@/types/contest";
 import { exampleStatements } from "./exampleStatements";
@@ -25,67 +14,30 @@ import { compileToPdf, typstInitPromise, registerImages } from "@/compiler";
 import { saveConfigToDB, loadConfigFromDB, exportConfig, importConfig, clearDB, saveImageToDB } from "@/utils/indexedDBUtils";
 import { loadPolygonPackage } from "@/utils/polygonConverter";
 import { useToast } from "@/components/ToastProvider";
-import ConfigPanel from "./ConfigPanel";
-import Preview, { type PreviewHandle, type PreviewPageInfo } from "./Preview";
+import { type PreviewHandle } from "./Preview";
+
+import Sidebar from "./Sidebar";
+import EditorArea from "./EditorArea";
+import PreviewArea from "./PreviewArea";
 
 import "./index.css";
 
 const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData }) => {
   const [contestData, updateContestData] = useImmer<ContestWithImages>(initialData);
+  const [activeId, setActiveId] = useState<string>('config');
   const [exportDisabled, setExportDisabled] = useState(true);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const [confirmModalContent, setConfirmModalContent] = useState({ title: '', content: '' });
   const [previewFullscreen, setPreviewFullscreen] = useState(false);
-  const [previewZoom, setPreviewZoom] = useState(100);
-  const [previewPageInfo, setPreviewPageInfo] = useState<PreviewPageInfo>({ currentPage: 1, totalPages: 1 });
-  const [previewPageInput, setPreviewPageInput] = useState("1");
-  const [isPageInputFocused, setIsPageInputFocused] = useState(false);
   const previewRef = useRef<PreviewHandle>(null);
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { showToast } = useToast();
-  const totalPages = Math.max(1, previewPageInfo.totalPages);
 
-  const handlePreviewPageInfoChange = useCallback((info: PreviewPageInfo) => {
-    setPreviewPageInfo((prev) => {
-      if (prev.currentPage === info.currentPage && prev.totalPages === info.totalPages) {
-        return prev;
-      }
-      return info;
-    });
-    if (!isPageInputFocused) {
-      setPreviewPageInput(String(info.currentPage));
-    }
-  }, [isPageInputFocused]);
-
-  const handleJumpToPage = useCallback(() => {
-    const parsed = Number(previewPageInput);
-    const total = Math.max(1, previewPageInfo.totalPages);
-    const current = Math.max(1, previewPageInfo.currentPage);
-
-    if (!Number.isFinite(parsed)) {
-      setPreviewPageInput(String(current));
-      return;
-    }
-
-    const target = Math.min(total, Math.max(1, Math.trunc(parsed)));
-    setPreviewPageInput(String(target));
-    previewRef.current?.jumpToPage(target);
-  }, [previewPageInfo.currentPage, previewPageInfo.totalPages, previewPageInput]);
-
-  const handlePrevPage = useCallback(() => {
-    if (previewPageInfo.currentPage <= 1) return;
-    const target = previewPageInfo.currentPage - 1;
-    setPreviewPageInput(String(target));
-    previewRef.current?.jumpToPage(target);
-  }, [previewPageInfo.currentPage]);
-
-  const handleNextPage = useCallback(() => {
-    if (previewPageInfo.currentPage >= totalPages) return;
-    const target = previewPageInfo.currentPage + 1;
-    setPreviewPageInput(String(target));
-    previewRef.current?.jumpToPage(target);
-  }, [previewPageInfo.currentPage, totalPages]);
+  // DND sensors - prevent accidental drags
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+  );
 
   // Debounced auto-save
   const debouncedSave = useMemo(() =>
@@ -111,6 +63,58 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
     typstInitPromise.then(() => { if (mounted) setExportDisabled(false); });
     return () => { mounted = false; };
   }, []);
+
+  // Toggle language
+  const toggleLanguage = useCallback(() => {
+    const newLang = i18n.language === "zh" ? "en" : "zh";
+    i18n.changeLanguage(newLang);
+    localStorage.setItem("language", newLang);
+  }, [i18n]);
+
+  // Handle drag end
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = contestData.problems.findIndex((p) => p.key === active.id);
+    const newIndex = contestData.problems.findIndex((p) => p.key === over.id);
+
+    if (oldIndex !== -1 && newIndex !== -1) {
+      updateContestData((draft) => {
+        draft.problems = arrayMove(draft.problems, oldIndex, newIndex);
+      });
+    }
+  };
+
+  // Handle add problem
+  const handleAddProblem = useCallback(() => {
+    const newKey = crypto.randomUUID();
+    updateContestData((draft) => {
+      draft.problems.push({
+        key: newKey,
+        problem: { display_name: "New Problem", samples: [{ input: "", output: "" }] },
+        statement: { description: "", input: "", output: "", notes: "" },
+      });
+    });
+    setActiveId(newKey);
+  }, []);
+
+  // Handle delete problem
+  const handleDeleteProblem = useCallback((key: string) => {
+    setConfirmModalContent({
+      title: t('messages:deleteProblemConfirm.title'),
+      content: t('messages:deleteProblemConfirm.content'),
+    });
+
+    setPendingAction(() => {
+      updateContestData((draft) => {
+        const idx = draft.problems.findIndex((p) => p.key === key);
+        if (idx !== -1) draft.problems.splice(idx, 1);
+      });
+      if (activeId === key) setActiveId('config');
+    });
+    setShowConfirmModal(true);
+  }, [activeId, t]);
 
   const handleLoadExample = async (key: string) => {
     setConfirmModalContent({
@@ -201,7 +205,6 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
     const input = document.createElement("input");
     input.type = "file";
     input.accept = ".zip";
-    // @ts-ignore - webkitdirectory is not in the type definition
     input.webkitdirectory = false;
     input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
@@ -272,177 +275,71 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
   };
 
   return (
-    <div className="contest-editor flex flex-col h-full">
-      {/* Top Toolbar */}
-      <div className="editor-toolbar">
-        <div className="editor-toolbar-left custom-scroll">
-          {/* Group A: Config/Data */}
-          <div className="dropdown">
-            <button tabIndex={0} className="btn-ghost whitespace-nowrap toolbar-action-btn">
-              <span className="toolbar-btn-label">{t('common:loadExample')}</span>
-              <FontAwesomeIcon icon={faChevronDown} className="ml-1 text-[10px]" />
-            </button>
-            <ul tabIndex={0} className="dropdown-content menu p-2 shadow-lg bg-white rounded-lg w-52 border border-gray-200">
-              {Object.keys(exampleStatements).map((k) => (
-                <li key={k}><a onClick={() => handleLoadExample(k)} className="text-sm">{k}</a></li>
-              ))}
-            </ul>
-          </div>
-          <button className="btn-ghost whitespace-nowrap toolbar-action-btn" onClick={handleImportPolygonPackage}>
-            <FontAwesomeIcon icon={faFolderOpen} className="mr-1.5 text-sm" />
-            <span className="toolbar-btn-label toolbar-btn-label-optional">{t('common:importPolygonPackage')}</span>
-          </button>
-          <button className="btn-ghost whitespace-nowrap toolbar-action-btn" onClick={handleImport}>
-            <FontAwesomeIcon icon={faFileImport} className="mr-1.5 text-sm" />
-            <span className="toolbar-btn-label toolbar-btn-label-optional">{t('common:importConfig')}</span>
-          </button>
-          <button className="btn-ghost whitespace-nowrap toolbar-action-btn" onClick={handleExport}>
-            <FontAwesomeIcon icon={faFileExport} className="mr-1.5 text-sm" />
-            <span className="toolbar-btn-label toolbar-btn-label-optional">{t('common:exportConfig')}</span>
-          </button>
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd} modifiers={[restrictToVerticalAxis]}>
+      <div className="flex h-full w-full bg-white overflow-hidden">
+        {/* Left Sidebar */}
+        <div className="w-[220px] flex-shrink-0 border-r border-gray-200 bg-white z-10">
+          <Sidebar
+            contestData={contestData}
+            activeId={activeId}
+            setActiveId={setActiveId}
+            onAddProblem={handleAddProblem}
+            onDeleteProblem={handleDeleteProblem}
+            onExportPdf={handleExportPdf}
+            onExportConfig={handleExport}
+            onImportConfig={handleImport}
+            onImportPolygon={handleImportPolygonPackage}
+            onLoadExample={handleLoadExample}
+            exportDisabled={exportDisabled}
+            toggleLanguage={toggleLanguage}
+            examples={Object.keys(exampleStatements)}
+          />
         </div>
 
-        {/* Group B: View/Main Action */}
-        <div className="editor-toolbar-right">
-          {previewFullscreen && (
-            <div className="toolbar-pill">
-              <button
-                className="toolbar-icon-btn"
-                onClick={() => setPreviewZoom(Math.max(50, previewZoom - 10))}
-                title="Zoom Out"
-                aria-label="Zoom Out"
-              >
-                <FontAwesomeIcon icon={faMagnifyingGlassMinus} className="text-sm" />
-              </button>
-              <span className="toolbar-zoom-value">{previewZoom}%</span>
-              <button
-                className="toolbar-icon-btn"
-                onClick={() => setPreviewZoom(Math.min(200, previewZoom + 10))}
-                title="Zoom In"
-                aria-label="Zoom In"
-              >
-                <FontAwesomeIcon icon={faMagnifyingGlassPlus} className="text-sm" />
-              </button>
-            </div>
-          )}
-
-          <button
-            className="btn-ghost whitespace-nowrap toolbar-fullscreen-btn toolbar-action-btn"
-            onClick={() => setPreviewFullscreen(!previewFullscreen)}
-            title={previewFullscreen ? t('common:exitFullscreen') : t('common:fullscreen')}
-          >
-            <FontAwesomeIcon icon={previewFullscreen ? faCompress : faExpand} className="mr-1.5 text-sm" />
-            <span className="toolbar-fullscreen-label">
-              {previewFullscreen ? t('common:exitFullscreen') : t('common:fullscreen')}
-            </span>
-          </button>
-
-          <div className="toolbar-pager" role="group" aria-label={t('common:page')}>
-            <button
-              className="toolbar-pager-btn"
-              onClick={handlePrevPage}
-              disabled={previewPageInfo.currentPage <= 1}
-              title="Previous Page"
-              aria-label="Previous Page"
-            >
-              <FontAwesomeIcon icon={faChevronLeft} className="text-[11px]" />
-            </button>
-            <div className="toolbar-pager-center">
-              <input
-                type="number"
-                min={1}
-                max={totalPages}
-                className="toolbar-page-current-input"
-                value={previewPageInput}
-                onChange={(e) => setPreviewPageInput(e.target.value)}
-                onFocus={() => setIsPageInputFocused(true)}
-                onBlur={() => {
-                  setIsPageInputFocused(false);
-                  if (previewPageInput.trim() === "") {
-                    setPreviewPageInput(String(previewPageInfo.currentPage));
-                    return;
-                  }
-                  handleJumpToPage();
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    handleJumpToPage();
-                    (e.currentTarget as HTMLInputElement).blur();
-                  }
-                }}
-                aria-label={t('common:goToPage')}
+        {/* Main Content: Editor + Preview */}
+        <div className="flex-1 h-full min-w-0">
+          <Allotment>
+            {/* Editor Area */}
+            <Allotment.Pane minSize={350} preferredSize="40%">
+              <EditorArea
+                contestData={contestData}
+                updateContestData={updateContestData}
+                activeId={activeId}
               />
-              <span className="toolbar-page-separator">/</span>
-              <span className="toolbar-page-total">{totalPages}</span>
-            </div>
-            <button
-              className="toolbar-pager-btn"
-              onClick={handleNextPage}
-              disabled={previewPageInfo.currentPage >= totalPages}
-              title="Next Page"
-              aria-label="Next Page"
-            >
-              <FontAwesomeIcon icon={faChevronRight} className="text-[11px]" />
-            </button>
-          </div>
+            </Allotment.Pane>
 
-          <div className="toolbar-section-divider" aria-hidden="true"></div>
-
-          <button
-            className="btn-primary toolbar-primary-btn shadow-sm"
-            onClick={handleExportPdf}
-            disabled={exportDisabled}
-          >
-            <FontAwesomeIcon icon={faFileArrowDown} className="mr-1.5 text-sm" />
-            <span className="toolbar-primary-label">{t('common:exportPdf')}</span>
-          </button>
+            {/* Preview Area */}
+            <Allotment.Pane minSize={400}>
+              <PreviewArea
+                data={contestData}
+                previewRef={previewRef}
+                isFullscreen={previewFullscreen}
+                setFullscreen={setPreviewFullscreen}
+              />
+            </Allotment.Pane>
+          </Allotment>
         </div>
-      </div>
 
-      {/* Main Content */}
-      {previewFullscreen ? (
-        <div className="flex-1 custom-scroll overflow-y-auto" style={{ backgroundColor: '#F3F4F6', padding: '24px' }}>
-          <div className="a4-paper min-h-[297mm] p-8 transition-transform duration-200" style={{ transform: `scale(${previewZoom / 100})`, transformOrigin: 'top center' }}>
-            <Preview ref={previewRef} data={contestData} onPageInfoChange={handlePreviewPageInfoChange} />
-          </div>
-        </div>
-      ) : (
-        <Allotment className="flex-1">
-          <Allotment.Pane minSize={300}>
-            <div className="custom-scroll h-full overflow-y-auto p-4 border-r border-gray-200 bg-white">
-              <ConfigPanel contestData={contestData} updateContestData={updateContestData} />
-            </div>
-          </Allotment.Pane>
-          <Allotment.Pane>
-            <div className="custom-scroll h-full overflow-y-auto" style={{ backgroundColor: '#F3F4F6', padding: '24px' }}>
-              <div className="a4-paper min-h-[297mm] p-8 transition-transform duration-200" style={{ transform: `scale(${previewZoom / 100})`, transformOrigin: 'top center' }}>
-                <Preview ref={previewRef} data={contestData} onPageInfoChange={handlePreviewPageInfoChange} />
+        {/* Custom Modal */}
+        {showConfirmModal && (
+          <div className="modal modal-open">
+            <div className="modal-box">
+              <h3 className="font-bold text-lg">{confirmModalContent.title}</h3>
+              <p className="py-4">{confirmModalContent.content}</p>
+              <div className="modal-action">
+                <button className="btn btn-ghost" onClick={() => { setShowConfirmModal(false); pendingAction?.(); }}>
+                  {t('common:cancel')}
+                </button>
+                <button className="btn btn-primary" onClick={() => { setShowConfirmModal(false); pendingAction?.(); }}>
+                  {t('common:continue')}
+                </button>
               </div>
             </div>
-          </Allotment.Pane>
-        </Allotment>
-      )}
-
-      {/* Custom Modal */}
-      {showConfirmModal && (
-        <div className="modal modal-open">
-          <div className="modal-box">
-            <h3 className="font-bold text-lg">{confirmModalContent.title}</h3>
-            <p className="py-4">{confirmModalContent.content}</p>
-            <div className="modal-action">
-              <button className="btn btn-ghost" onClick={() => { setShowConfirmModal(false); pendingAction?.(); }}>
-                {t('common:cancel')}
-              </button>
-              <button className="btn btn-primary" onClick={() => { setShowConfirmModal(false); pendingAction?.(); }}>
-                {t('common:continue')}
-              </button>
-            </div>
+            <div className="modal-backdrop" onClick={() => setShowConfirmModal(false)}></div>
           </div>
-          <div className="modal-backdrop" onClick={() => setShowConfirmModal(false)}></div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </DndContext>
   );
 };
 

@@ -1,5 +1,6 @@
 {
   "loadExample": "载入示例",
+  "settings": "设置",
   "importPolygonPackage": "导入 Polygon 比赛包",
   "importConfig": "导入配置",
   "exportConfig": "导出配置",
