@@ -41,7 +41,7 @@ const ProblemItem: FC<{
   };
 
   return (
-    <div className="relative">
+    <div className="relative z-0">
       <div
         ref={setNodeRef}
         style={style}
@@ -65,7 +65,7 @@ const ProblemItem: FC<{
       {showMenu && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
-          <div className="absolute left-12 top-0 z-50 bg-white rounded-lg shadow-xl border border-gray-200 py-1 min-w-[120px]">
+          <div className="fixed left-14 top-2 z-50 bg-white rounded-lg shadow-xl border border-gray-200 py-1 min-w-[120px]">
             <button
               className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
               onClick={() => { onClick(); setShowMenu(false); }}
