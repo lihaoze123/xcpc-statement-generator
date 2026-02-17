@@ -377,6 +377,26 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
                 updateContestData={updateContestData}
                 activeId={activeId}
                 onDeleteProblem={handleDeleteProblem}
+                onExportCurrentProblem={() => {
+                  if (!activeId || activeId === 'config' || activeId === 'images') return;
+
+                  compileProblemToPdf(contestData, activeId)
+                    .then(pdf => {
+                      const blob = new Blob([new Uint8Array(pdf)], { type: "application/pdf" });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      const index = contestData.problems.findIndex(p => p.key === activeId);
+                      const letter = String.fromCharCode(65 + index);
+                      a.download = `${contestData.meta.title || "contest"}-${letter}.pdf`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                      showToast(t('editor:exportSuccess'), 'success');
+                    })
+                    .catch(err => {
+                      showToast(t('editor:exportFailed') + ': ' + (err instanceof Error ? err.message : String(err)), 'error');
+                    });
+                }}
                 vimMode={vimMode}
               />
             </Allotment.Pane>

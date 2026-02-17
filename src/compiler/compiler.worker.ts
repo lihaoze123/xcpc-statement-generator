@@ -155,7 +155,7 @@ function buildTypstDocument(contest: ContestWithImages, problemKey?: string): st
     })),
     // 导出单题时禁用标题页和题号列表
     enableTitlepage: problemKey ? false : contest.meta.enable_titlepage,
-    enableHeaderFooter: contest.meta.enable_header_footer,
+    enableHeaderFooter: problemKey ? false : contest.meta.enable_header_footer,
     enableProblemList: problemKey ? false : contest.meta.enable_problem_list,
     titlepageLanguage: contest.meta.titlepage_language || "auto",
     problemLanguage: contest.meta.problem_language || "auto"
