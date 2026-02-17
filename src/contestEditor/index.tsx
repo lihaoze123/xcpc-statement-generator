@@ -6,7 +6,8 @@ import { Allotment } from "allotment";
 import "allotment/dist/style.css";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
-import { arrayMove } from "@dnd-kit/sortable";
+import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFileCode, faLanguage, faUpload, faFileZipper, faX, faImages, faChevronDown, faArrowsDownToLine } from "@fortawesome/free-solid-svg-icons";
 
@@ -23,6 +24,31 @@ import EditorArea from "./EditorArea";
 import PreviewArea from "./PreviewArea";
 
 import "./index.css";
+
+const SortableReorderItem: FC<{ problem: ContestWithImages['problems'][0]; index: number }> = ({ problem, index }) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: problem.key! });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-grab active:cursor-grabbing"
+    >
+      <span className="w-6 h-6 flex items-center justify-center bg-white rounded border text-sm font-medium">
+        {String.fromCharCode(65 + index)}
+      </span>
+      <span className="flex-1 truncate">{problem.problem.display_name}</span>
+    </div>
+  );
+};
 
 const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData }) => {
   const [contestData, updateContestData] = useImmer<ContestWithImages>(initialData);
@@ -421,19 +447,20 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
                   <FontAwesomeIcon icon={faX} />
                 </button>
               </div>
-              <div className="flex flex-col gap-2 max-h-[60vh] overflow-y-auto">
-                {contestData.problems.map((problem, index) => (
-                  <div
-                    key={problem.key}
-                    className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-grab active:cursor-grabbing"
-                  >
-                    <span className="w-6 h-6 flex items-center justify-center bg-white rounded border text-sm font-medium">
-                      {String.fromCharCode(65 + index)}
-                    </span>
-                    <span className="flex-1 truncate">{problem.problem.display_name}</span>
-                  </div>
-                ))}
-              </div>
+              <SortableContext
+                items={contestData.problems.map((p) => p.key!)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="flex flex-col gap-2 max-h-[60vh] overflow-y-auto select-none">
+                  {contestData.problems.map((problem, index) => (
+                    <SortableReorderItem
+                      key={problem.key}
+                      problem={problem}
+                      index={index}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
               <p className="text-sm text-gray-500 mt-4 text-center">拖拽题目以重新排序</p>
             </div>
             <div className="modal-backdrop" onClick={() => setShowReorder(false)}></div>
