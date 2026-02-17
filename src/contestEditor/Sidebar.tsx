@@ -2,7 +2,8 @@ import type { FC } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faGear, faPlus, faFilePdf, faPenToSquare, faImages } from "@fortawesome/free-solid-svg-icons";
 import { useTranslation } from "react-i18next";
-import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import type { ContestWithImages, Problem } from "@/types/contest";
 
 interface SidebarProps {
@@ -24,10 +25,22 @@ const ProblemItem: FC<{
   isActive: boolean;
   onClick: () => void;
 }> = ({ problem, index, isActive, onClick }) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: problem.key! });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
   return (
     <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
       className={`
-        flex items-center justify-center w-10 h-10 mx-auto my-0.5 rounded-md cursor-grab
+        flex items-center justify-center w-10 h-10 mx-auto my-0.5 rounded-md cursor-grab active:cursor-grabbing
         transition-all duration-150 text-sm font-medium select-none border-2
         ${isActive
           ? 'border-[#1D71B7] text-[#1D71B7]'
