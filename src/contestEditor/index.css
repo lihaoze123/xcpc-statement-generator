@@ -11,21 +11,6 @@
   color: #666;
 }
 
-.contest-editor .toolbar {
-  padding: 12px 16px;
-  border-bottom: 1px solid #f0f0f0;
-  background: #fafafa;
-}
-
-.contest-editor .editor-body {
-  flex: 1;
-  min-height: 0;
-}
-
-.contest-editor .editor-body .ant-splitter-panel {
-  overflow-y: auto;
-}
-
 .config-panel {
   padding: 16px;
 }
@@ -34,7 +19,7 @@
   width: 100%;
   height: 100%;
   position: relative;
-  background: #f5f5f5;
+  background: var(--color-base-200, #F5EFE9);
 }
 
 .preview-container {
@@ -49,10 +34,6 @@
 }
 
 /* Image upload section styles */
-.image-upload-section .ant-upload-drag {
-  padding: 16px;
-}
-
 .upload-dragger-content {
   display: flex;
   flex-direction: column;
@@ -68,10 +49,10 @@
 }
 
 .image-item {
-  border: 1px solid #e8e8e8;
+  border: 1px solid var(--color-base-border, #EBE5DD);
   border-radius: 4px;
   overflow: hidden;
-  background: #fafafa;
+  background: var(--color-base-200, #F5EFE9);
 }
 
 .image-thumbnail-container {
@@ -80,18 +61,18 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f5f5f5;
+  background: var(--color-base-300, #EBE5DD);
   background-image:
-    linear-gradient(45deg, #e0e0e0 25%, transparent 25%),
-    linear-gradient(-45deg, #e0e0e0 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, #e0e0e0 75%),
-    linear-gradient(-45deg, transparent 75%, #e0e0e0 75%);
+    linear-gradient(45deg, #d0d0d0 25%, transparent 25%),
+    linear-gradient(-45deg, #d0d0d0 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #d0d0d0 75%),
+    linear-gradient(-45deg, transparent 75%, #d0d0d0 75%);
   background-size: 10px 10px;
-  background-position: 0 0, 0 5px, 5px -5px, -5px 0px;
+  background-position: 0 0, 0 5px -5px, -5px 0px;
 }
 
 .image-thumbnail {
-  max-width: 100%;
+  max-width:, 5px 100%;
   max-height: 80px;
   object-fit: contain;
   display: block;

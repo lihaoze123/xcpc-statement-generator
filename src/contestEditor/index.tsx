@@ -1,8 +1,7 @@
 import { type FC, useEffect, useState, useMemo, Suspense, use } from "react";
 import { useImmer } from "use-immer";
-import { App, Button, Space, Dropdown, Splitter } from "antd";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFileArrowDown, faFileImport, faFileExport, faChevronDown, faFolderOpen } from "@fortawesome/free-solid-svg-icons";
+import { faFileArrowDown, faFileImport, faFileExport, faChevronDown, faFolderOpen, faExpand, faCompress, faMagnifyingGlassPlus, faMagnifyingGlassMinus } from "@fortawesome/free-solid-svg-icons";
 import { debounce } from "lodash";
 import { useTranslation } from "react-i18next";
 
@@ -16,10 +15,30 @@ import Preview from "./Preview";
 
 import "./index.css";
 
+// Toast helper
+const showToast = (toastMessage: string, type: 'success' | 'error' | 'info' = 'info') => {
+  const existingToast = document.querySelector('.toast-container');
+  if (existingToast) existingToast.remove();
+
+  const toast = document.createElement('div');
+  toast.className = 'toast toast-end toast-bottom z-50';
+  toast.innerHTML = `
+    <div class="alert alert-${type}">
+      <span>${toastMessage}</span>
+    </div>
+  `;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+};
+
 const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData }) => {
   const [contestData, updateContestData] = useImmer<ContestWithImages>(initialData);
   const [exportDisabled, setExportDisabled] = useState(true);
-  const { modal, notification, message } = App.useApp();
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
+  const [confirmModalContent, setConfirmModalContent] = useState({ title: '', content: '' });
+  const [previewFullscreen, setPreviewFullscreen] = useState(false);
+  const [previewZoom, setPreviewZoom] = useState(100);
   const { t } = useTranslation();
 
   // Debounced auto-save
@@ -48,12 +67,16 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
   }, []);
 
   const handleLoadExample = async (key: string) => {
-    const confirmed = await modal.confirm({
+    setConfirmModalContent({
       title: t('messages:loadExampleConfirm.title'),
       content: t('messages:loadExampleConfirm.content'),
-      okText: t('common:continue'),
-      cancelText: t('common:cancel'),
     });
+
+    const confirmed = await new Promise<boolean>((resolve) => {
+      setPendingAction(() => resolve(true));
+      setShowConfirmModal(true);
+    });
+
     if (!confirmed) return;
 
     // Revoke old blob URLs
@@ -74,7 +97,7 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
     updateContestData(() => exampleData);
     await clearDB();
     await saveConfigToDB(exampleData);
-    message.success(t('messages:exampleLoaded'));
+    showToast(t('messages:exampleLoaded'));
   };
 
   const handleImport = () => {
@@ -120,14 +143,9 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
 
         updateContestData(() => contestWithImages);
         await saveConfigToDB(contestWithImages);
-        message.success(t('messages:configImportSuccess'));
+        showToast(t('messages:configImportSuccess'));
       } catch (err) {
-        (notification as any).open({
-          type: "error",
-          message: t('messages:importFailed'),
-          description: err instanceof Error ? err.message : String(err),
-          placement: "bottomRight",
-        });
+        showToast(t('messages:importFailed') + ': ' + (err instanceof Error ? err.message : String(err)), 'error');
       }
     };
     input.click();
@@ -143,7 +161,6 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
 
-      const loadingMessage = message.loading(t('messages:parsingPolygonPackage'), 0);
       try {
         // Revoke old blob URLs
         for (const img of contestData.images) {
@@ -164,16 +181,9 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
         };
         updateContestData(() => contestWithImages);
         await saveConfigToDB(contestWithImages);
-        loadingMessage();
-        message.success(t('messages:polygonImportSuccess'));
+        showToast(t('messages:polygonImportSuccess'), 'success');
       } catch (err) {
-        loadingMessage();
-        (notification as any).open({
-          type: "error",
-          message: t('messages:importFailed'),
-          description: err instanceof Error ? err.message : String(err),
-          placement: "bottomRight",
-        });
+        showToast(t('messages:importFailed') + ': ' + (err instanceof Error ? err.message : String(err)), 'error');
       }
     };
     input.click();
@@ -189,14 +199,9 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
       a.download = `${contestData.meta.title || "contest"}-config.json`;
       a.click();
       URL.revokeObjectURL(url);
-      message.success(t('messages:configExportSuccess'));
+      showToast(t('messages:configExportSuccess'));
     } catch (err) {
-      (notification as any).open({
-        type: "error",
-        message: t('messages:exportFailed'),
-        description: err instanceof Error ? err.message : String(err),
-        placement: "bottomRight",
-      });
+      showToast(t('messages:exportFailed') + ': ' + (err instanceof Error ? err.message : String(err)), 'error');
     }
   };
 
@@ -215,59 +220,112 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
-      (notification as any).open({
-        type: "error",
-        message: t('messages:pdfExportFailed'),
-        description: err instanceof Error ? err.message : String(err),
-        placement: "bottomRight",
-      });
+      showToast(t('messages:pdfExportFailed') + ': ' + (err instanceof Error ? err.message : String(err)), 'error');
     }
     setExportDisabled(false);
   };
 
   return (
-    <div className="contest-editor">
-      <div className="toolbar">
-        <Space>
-          <Dropdown
-            menu={{
-              items: Object.keys(exampleStatements).map((k) => ({ key: k, label: k })),
-              onClick: ({ key }) => handleLoadExample(key),
-            }}
-            trigger={["click"]}
-          >
-            <Button>
-              {t('common:loadExample')} <FontAwesomeIcon icon={faChevronDown} />
-            </Button>
-          </Dropdown>
-          <Button icon={<FontAwesomeIcon icon={faFolderOpen} />} onClick={handleImportPolygonPackage}>
-            {t('common:importPolygonPackage')}
-          </Button>
-          <Button icon={<FontAwesomeIcon icon={faFileImport} />} onClick={handleImport}>
-            {t('common:importConfig')}
-          </Button>
-          <Button icon={<FontAwesomeIcon icon={faFileExport} />} onClick={handleExport}>
-            {t('common:exportConfig')}
-          </Button>
-          <Button
-            type="primary"
-            icon={<FontAwesomeIcon icon={faFileArrowDown} />}
-            disabled={exportDisabled}
-            onClick={handleExportPdf}
-          >
-            {t('common:exportPdf')}
-          </Button>
-        </Space>
+    <div className="contest-editor flex flex-col h-full">
+      {/* Top Toolbar */}
+      <div className="flex items-center gap-1 px-4 py-2 bg-white border-b border-gray-200">
+        {/* Group A: Config/Data */}
+        <div className="dropdown">
+          <button tabIndex={0} className="btn-ghost">
+            {t('common:loadExample')} <FontAwesomeIcon icon={faChevronDown} className="ml-1" />
+          </button>
+          <ul tabIndex={0} className="dropdown-content menu p-2 shadow-lg bg-white rounded-lg w-52 border border-gray-200">
+            {Object.keys(exampleStatements).map((k) => (
+              <li key={k}><a onClick={() => handleLoadExample(k)} className="text-sm">{k}</a></li>
+            ))}
+          </ul>
+        </div>
+        <button className="btn-ghost" onClick={handleImportPolygonPackage}>
+          <FontAwesomeIcon icon={faFolderOpen} className="mr-1.5 text-sm" />
+          {t('common:importPolygonPackage')}
+        </button>
+        <button className="btn-ghost" onClick={handleImport}>
+          <FontAwesomeIcon icon={faFileImport} className="mr-1.5 text-sm" />
+          {t('common:importConfig')}
+        </button>
+        <button className="btn-ghost" onClick={handleExport}>
+          <FontAwesomeIcon icon={faFileExport} className="mr-1.5 text-sm" />
+          {t('common:exportConfig')}
+        </button>
+
+        {/* Divider */}
+        <div className="w-px h-6 bg-gray-200 mx-2"></div>
+
+        {/* Group B: View/Main Action */}
+        {previewFullscreen && (
+          <>
+            <button
+              className="btn-ghost"
+              onClick={() => setPreviewZoom(Math.max(50, previewZoom - 10))}
+              title="Zoom Out"
+            >
+              <FontAwesomeIcon icon={faMagnifyingGlassMinus} className="text-sm" />
+            </button>
+            <span className="text-xs text-gray-500 min-w-[40px] text-center">{previewZoom}%</span>
+            <button
+              className="btn-ghost"
+              onClick={() => setPreviewZoom(Math.min(200, previewZoom + 10))}
+              title="Zoom In"
+            >
+              <FontAwesomeIcon icon={faMagnifyingGlassPlus} className="text-sm" />
+            </button>
+          </>
+        )}
+        <button
+          className="btn-ghost"
+          onClick={() => setPreviewFullscreen(!previewFullscreen)}
+          title={previewFullscreen ? t('common:exitFullscreen') : t('common:fullscreen')}
+        >
+          <FontAwesomeIcon icon={previewFullscreen ? faCompress : faExpand} className="mr-1.5 text-sm" />
+          {previewFullscreen ? t('common:exitFullscreen') : t('common:fullscreen')}
+        </button>
+        <button
+          className="btn-primary ml-1"
+          onClick={handleExportPdf}
+          disabled={exportDisabled}
+        >
+          <FontAwesomeIcon icon={faFileArrowDown} className="mr-1.5 text-sm" />
+          {t('common:exportPdf')}
+        </button>
       </div>
 
-      <Splitter className="editor-body">
-        <Splitter.Panel min={300} defaultSize="50%">
+      {/* Main Content */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left: Config Panel */}
+        <div className={`${previewFullscreen ? 'hidden' : 'w-1/2'} custom-scroll min-w-[400px] overflow-y-auto p-4 border-r border-gray-200 bg-white transition-all duration-200`}>
           <ConfigPanel contestData={contestData} updateContestData={updateContestData} />
-        </Splitter.Panel>
-        <Splitter.Panel min={300} collapsible>
-          <Preview data={contestData} />
-        </Splitter.Panel>
-      </Splitter>
+        </div>
+        {/* Right: Preview Area */}
+        <div className={`${previewFullscreen ? 'w-full' : 'w-1/2'} custom-scroll flex-1 overflow-y-auto`} style={{ backgroundColor: '#F3F4F6', padding: previewFullscreen ? '24px' : '24px 24px' }}>
+          <div className="a4-paper min-h-[297mm] p-8 transition-transform duration-200" style={{ transform: `scale(${previewZoom / 100})`, transformOrigin: 'top center' }}>
+            <Preview data={contestData} />
+          </div>
+        </div>
+      </div>
+
+      {/* Custom Modal */}
+      {showConfirmModal && (
+        <div className="modal modal-open">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg">{confirmModalContent.title}</h3>
+            <p className="py-4">{confirmModalContent.content}</p>
+            <div className="modal-action">
+              <button className="btn btn-ghost" onClick={() => { setShowConfirmModal(false); pendingAction?.(); }}>
+                {t('common:cancel')}
+              </button>
+              <button className="btn btn-primary" onClick={() => { setShowConfirmModal(false); pendingAction?.(); }}>
+                {t('common:continue')}
+              </button>
+            </div>
+          </div>
+          <div className="modal-backdrop" onClick={() => setShowConfirmModal(false)}></div>
+        </div>
+      )}
     </div>
   );
 };

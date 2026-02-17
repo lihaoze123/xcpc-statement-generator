@@ -11,5 +11,7 @@
   "clearCache": "Clear Cache",
   "refresh": "Refresh",
   "add": "Add",
-  "delete": "Delete"
+  "delete": "Delete",
+  "fullscreen": "Fullscreen",
+  "exitFullscreen": "Exit Fullscreen"
 }

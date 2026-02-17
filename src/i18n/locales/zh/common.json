@@ -11,5 +11,7 @@
   "clearCache": "清空缓存",
   "refresh": "刷新",
   "add": "添加",
-  "delete": "删除"
+  "delete": "删除",
+  "fullscreen": "全屏",
+  "exitFullscreen": "退出全屏"
 }

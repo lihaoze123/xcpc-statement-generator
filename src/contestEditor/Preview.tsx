@@ -1,8 +1,6 @@
 import { memo, useEffect, useRef, useState } from "react";
 import type { ContestWithImages } from "@/types/contest";
 import { compileToSvgDebounced, typstInitPromise } from "@/compiler";
-import { Alert, Spin } from "antd";
-import { isEqual } from "lodash";
 
 const TypstPreviewContainer = memo<{ svg: string }>(({ svg }) => {
   const ref = useRef<HTMLDivElement>(null);
@@ -26,7 +24,7 @@ const TypstPreviewContainer = memo<{ svg: string }>(({ svg }) => {
   return <div ref={ref} />;
 });
 
-const Preview = memo<{ data: ContestWithImages }>(({ data }) => {
+const Preview = ({ data }: { data: ContestWithImages }) => {
   const [error, setError] = useState<string>();
   const [svg, setSvg] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -93,17 +91,20 @@ const Preview = memo<{ data: ContestWithImages }>(({ data }) => {
   return (
     <div className="preview">
       {error && (
-        <Alert
-          message="渲染出错"
-          description={error}
-          type="error"
-          showIcon
-          style={{ margin: 16, position: "absolute", top: 0, left: 0, width: "calc(100% - 32px)", zIndex: 10 }}
-        />
+        <div className="alert alert-error m-4 absolute top-0 left-0 right-0 z-10">
+          <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <div>
+            <div className="font-bold">渲染出错</div>
+            <div className="text-xs">{error}</div>
+          </div>
+        </div>
       )}
       {loading && !svg && (
-        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%", minHeight: 200 }}>
-          <Spin size="large" tip="正在编译..." />
+        <div className="flex justify-center items-center h-full min-h-[200px]">
+          <span className="loading loading-spinner loading-lg"></span>
+          <span className="ml-2">正在编译...</span>
         </div>
       )}
       {svg && (
@@ -113,6 +114,6 @@ const Preview = memo<{ data: ContestWithImages }>(({ data }) => {
       )}
     </div>
   );
-}, isEqual);
+};
 
 export default Preview;
