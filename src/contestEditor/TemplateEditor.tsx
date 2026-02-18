@@ -1,10 +1,13 @@
 import { type FC, useState } from "react";
 import CodeMirror from "@uiw/react-codemirror";
+import { keymap } from "@codemirror/view";
+import { Prec } from "@codemirror/state";
 import { markdown } from "@codemirror/lang-markdown";
 import { useTranslation } from "react-i18next";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faRotateRight, faSave } from "@fortawesome/free-solid-svg-icons";
 import TypstTemplateLib from "typst-template/lib.typ?raw";
+import { insertFourSpaces, outdentFourSpaces } from "@/utils/codemirrorTab";
 
 interface TemplateEditorProps {
   template: string | undefined;
@@ -67,7 +70,13 @@ const TemplateEditor: FC<TemplateEditorProps> = ({ template, onSave }) => {
         <CodeMirror
           value={content}
           height="100%"
-          extensions={[markdown()]}
+          extensions={[
+            markdown(),
+            Prec.highest(keymap.of([
+              { key: "Tab", run: insertFourSpaces, preventDefault: true },
+              { key: "Shift-Tab", run: outdentFourSpaces, preventDefault: true },
+            ])),
+          ]}
           onChange={(value) => setContent(value)}
           className="h-full"
           basicSetup={{
