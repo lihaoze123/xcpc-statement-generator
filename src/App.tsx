@@ -22,9 +22,11 @@ const App: FC = () => {
               target="_blank"
               rel="noopener noreferrer"
             >
-              <FontAwesomeIcon icon={faGithub} className="mr-1" />
-              {appName} v{appVersion} ({GIT_COMMIT_INFO}) · Developed by chumeng with ❤️
+              <FontAwesomeIcon icon={faGithub} className="mr-1.5" />
+              {appName} v{appVersion} · {GIT_COMMIT_INFO}
             </a>
+            <span className="mx-2">·</span>
+            <span>Developed by chumeng with ♥️</span>
           </footer>
         </div>
       </TypstInitStatusProvider>
