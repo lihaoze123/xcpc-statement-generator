@@ -209,6 +209,21 @@ async function compileToPdf(contest: ContestWithImages, problemKey?: string): Pr
   return pdf;
 }
 
+async function getArtifact(contest: ContestWithImages): Promise<Uint8Array> {
+  if (!isInitialized) throw new Error("Typst compiler not initialized");
+
+  // Add images to virtual filesystem
+  await addImagesToFilesystem(contest);
+
+  const doc = buildTypstDocument(contest, undefined, contest.template);
+  $typst.addSource("/main.typ", doc);
+
+  // Use vector format for rendering (not pdf)
+  const artifact = await $typst.vector({ mainFilePath: "/main.typ" });
+  if (!artifact) throw new Error("Artifact compilation returned empty result");
+  return artifact;
+}
+
 async function renderToSvg(contest: ContestWithImages): Promise<string> {
   if (!isInitialized) throw new Error("Typst compiler not initialized");
 
@@ -221,6 +236,7 @@ async function renderToSvg(contest: ContestWithImages): Promise<string> {
   const svg = await $typst.svg({ mainFilePath: "/main.typ" });
   return svg;
 }
+
 
 // Message handler
 self.addEventListener('message', async (event) => {
@@ -248,6 +264,11 @@ self.addEventListener('message', async (event) => {
       case "compileTypst":
         const pdf = await compileToPdf(data as ContestWithImages);
         self.postMessage({ id, success: true, data: pdf });
+        break;
+
+      case "getArtifact":
+        const artifact = await getArtifact(data as ContestWithImages);
+        self.postMessage({ id, success: true, data: artifact });
         break;
 
       case "compileProblem": {

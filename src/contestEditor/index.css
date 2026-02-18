@@ -19,18 +19,59 @@
   width: 100%;
   height: 100%;
   position: relative;
-  background: var(--color-base-200, #F5EFE9);
+  background: #f3f4f6;
+}
+
+.preview-surface {
+  border-radius: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .preview-container {
   overflow: auto;
-  height: 100%;
+  height: auto;
+  flex: 1;
+  min-height: 0;
   transform: translateZ(0);
+  background: #e5e7eb;
 }
 
-.preview-container > div {
-  padding: 16px;
-  background: white;
+.preview-pages {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  padding: 20px 20px 110px;
+}
+
+.preview-page {
+  background: #ffffff;
+  border-radius: 2px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
+  overflow: hidden;
+}
+
+.preview-loading-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(229, 231, 235, 0.9);
+  color: #475569;
+}
+
+@media (max-width: 768px) {
+  .preview-pages {
+    gap: 18px;
+    padding: 20px 12px 92px;
+  }
 }
 
 /* Toolbar layout and compact controls */

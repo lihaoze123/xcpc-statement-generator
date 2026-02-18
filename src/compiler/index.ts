@@ -4,6 +4,7 @@ import fontUrlEntries from "virtual:typst-font-url-entries";
 import TypstCompilerWasmUrl from "@myriaddreamin/typst-ts-web-compiler/pkg/typst_ts_web_compiler_bg.wasm?url";
 import TypstRendererWasmUrl from "@myriaddreamin/typst-ts-renderer/pkg/typst_ts_renderer_bg.wasm?url";
 import TypstWorker from "./compiler.worker?worker";
+import { createTypstRenderer, type TypstRenderer, type RenderSession } from "@myriaddreamin/typst.ts/dist/esm/renderer.mjs";
 
 const worker = new TypstWorker();
 
@@ -77,6 +78,143 @@ export class TypstInitTask {
 }
 
 let fontBuffers: ArrayBuffer[];
+
+// Main thread renderer (for Canvas rendering)
+let mainThreadRenderer: TypstRenderer | null = null;
+let mainThreadRendererInitPromise: Promise<TypstRenderer> | null = null;
+
+async function initMainThreadRenderer(): Promise<TypstRenderer> {
+  if (mainThreadRenderer) return mainThreadRenderer;
+  if (mainThreadRendererInitPromise) return mainThreadRendererInitPromise;
+
+  mainThreadRendererInitPromise = (async () => {
+    const renderer = createTypstRenderer();
+    await renderer.init({
+      getModule: () => fetch(TypstRendererWasmUrl).then(r => r.arrayBuffer()),
+    });
+    mainThreadRenderer = renderer;
+    return renderer;
+  })();
+
+  return mainThreadRendererInitPromise;
+}
+
+export type CanvasPageInfo = {
+  pageOffset: number;
+  width: number;
+  height: number;
+};
+
+// Render to Canvas with pagination - returns page info and data URLs
+export const renderToCanvas = async (
+  artifact: Uint8Array,
+  pixelPerPt: number = 2
+): Promise<{ pages: CanvasPageInfo[]; pageDataUrls: string[] }> => {
+  const renderer = await initMainThreadRenderer();
+
+  // Use runWithSession to create a session and render each page
+  const result = await renderer.runWithSession(
+    {
+      format: "vector",
+      artifactContent: artifact,
+    },
+    async (session: RenderSession) => {
+      // Get page info using retrievePagesInfo
+      const pageInfos = session.retrievePagesInfo();
+      const pageCount = pageInfos.length;
+      const pages: CanvasPageInfo[] = [];
+      const pageDataUrls: string[] = [];
+
+      // Render each page to canvas
+      for (let i = 0; i < pageCount; i++) {
+        const page = pageInfos[i];
+        const width = Math.ceil(page.width * pixelPerPt);
+        const height = Math.ceil(page.height * pixelPerPt);
+
+        pages.push({
+          pageOffset: page.pageOffset,
+          width,
+          height,
+        });
+
+        // Create canvas for this page
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) throw new Error("Failed to get 2D context");
+
+        // Render page to canvas
+        await renderer.renderCanvas({
+          renderSession: session,
+          canvas: ctx,
+          pageOffset: i,
+          pixelPerPt,
+          backgroundColor: "#ffffff",
+        });
+
+        // Convert to data URL
+        const dataUrl = canvas.toDataURL("image/png");
+        pageDataUrls.push(dataUrl);
+      }
+
+      return { pages, pageDataUrls };
+    }
+  );
+
+  return result;
+};
+
+// Debounced version with delay
+const DEBOUNCE_DELAY = 300; // ms
+
+export const renderToCanvasDebounced = (() => {
+  type Task = {
+    args: { artifact: Uint8Array; pixelPerPt?: number };
+    resolve: (v: { pages: CanvasPageInfo[]; pageDataUrls: string[] } | undefined) => void;
+    reject: (e: unknown) => void;
+  };
+
+  let currentTask: Task | undefined;
+  let waitingTask: Task | undefined;
+  let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+
+  const run = () => {
+    if (currentTask || !waitingTask) return;
+    currentTask = waitingTask;
+    waitingTask = undefined;
+
+    renderToCanvas(currentTask.args.artifact, currentTask.args.pixelPerPt)
+      .then(currentTask.resolve)
+      .catch(currentTask.reject)
+      .finally(() => {
+        currentTask = undefined;
+        run();
+      });
+  };
+
+  return (args: { artifact: Uint8Array; pixelPerPt?: number }): Promise<{ pages: CanvasPageInfo[]; pageDataUrls: string[] } | undefined> => {
+    return new Promise((resolve, reject) => {
+      // Clear existing timer
+      if (debounceTimer) {
+        clearTimeout(debounceTimer);
+      }
+      // Cancel waiting task
+      if (waitingTask) {
+        waitingTask.reject("Aborted");
+      }
+
+      // Set up new task with delay
+      waitingTask = { args, resolve, reject };
+
+      // Delay before starting render
+      debounceTimer = setTimeout(() => {
+        debounceTimer = undefined;
+        run();
+      }, DEBOUNCE_DELAY);
+    });
+  };
+})();
 
 export let fontAccessConfirmResolve: (() => void) | undefined;
 
@@ -242,6 +380,54 @@ export const registerImages = async (images: ImageData[]): Promise<void> => {
 export const compileToPdf = (data: ContestWithImages): Promise<Uint8Array> =>
   sendMessage("compileTypst", data);
 
+export const getArtifact = (data: ContestWithImages): Promise<Uint8Array> =>
+  sendMessage("getArtifact", data);
+
+// Debounced version of getArtifact with delay
+export const getArtifactDebounced = (() => {
+  type Task = {
+    args: ContestWithImages;
+    resolve: (v: Uint8Array | undefined) => void;
+    reject: (e: unknown) => void;
+  };
+
+  let currentTask: Task | undefined;
+  let waitingTask: Task | undefined;
+  let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+
+  const run = () => {
+    if (currentTask || !waitingTask) return;
+    currentTask = waitingTask;
+    waitingTask = undefined;
+
+    getArtifact(currentTask.args)
+      .then(currentTask.resolve)
+      .catch(currentTask.reject)
+      .finally(() => {
+        currentTask = undefined;
+        run();
+      });
+  };
+
+  return (args: ContestWithImages): Promise<Uint8Array | undefined> => {
+    return new Promise((resolve, reject) => {
+      if (debounceTimer) {
+        clearTimeout(debounceTimer);
+      }
+      if (waitingTask) {
+        waitingTask.reject("Aborted");
+      }
+
+      waitingTask = { args, resolve, reject };
+
+      debounceTimer = setTimeout(() => {
+        debounceTimer = undefined;
+        run();
+      }, DEBOUNCE_DELAY);
+    });
+  };
+})();
+
 export const compileProblemToPdf = (data: ContestWithImages, problemKey: string): Promise<Uint8Array> =>
   sendMessage("compileProblem", { contest: data, problemKey });
 
@@ -280,3 +466,4 @@ export const compileToSvgDebounced = (() => {
     });
   };
 })();
+

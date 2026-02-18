@@ -30,42 +30,40 @@ const PreviewArea: FC<PreviewAreaProps> = ({ data, previewRef, isFullscreen, set
     setPageInput(String(target));
   };
 
+  const handlePageInputCommit = () => {
+    const parsed = Number(pageInput);
+    if (!Number.isFinite(parsed)) {
+      setPageInput(String(pageInfo.currentPage));
+      return;
+    }
+    jumpTo(parsed);
+  };
+
   const wrapperClass = isFullscreen
-    ? "fixed inset-0 z-50 bg-[#F3F4F6] flex flex-col"
-    : "h-full relative bg-[#F3F4F6] flex flex-col border-l border-gray-200";
+    ? "fixed inset-0 z-50 bg-[#F3F4F6] flex flex-col min-h-0"
+    : "h-full relative bg-[#F3F4F6] flex flex-col min-h-0 border-l border-gray-200";
 
   return (
     <div className={wrapperClass}>
       {/* Preview Content */}
-      <div className="flex-1 overflow-y-auto custom-scroll relative" style={{ padding: '24px' }}>
-        <div
-          className="mx-auto bg-white shadow-sm transition-transform duration-200 origin-top"
-          style={{
-            width: '210mm',
-            maxWidth: '100%',
-            minHeight: '297mm',
-            transform: `scale(${zoom / 100})`,
-            marginBottom: isFullscreen ? '100px' : '0'
-          }}
-        >
-          <Preview ref={previewRef} data={data} onPageInfoChange={handlePageInfoChange} />
-        </div>
+      <div className="relative flex-1 min-h-0">
+        <Preview ref={previewRef} data={data} zoom={zoom} onPageInfoChange={handlePageInfoChange} />
       </div>
 
       {/* Floating Control Bar */}
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur shadow-lg border border-gray-200 rounded-full px-4 py-2 flex items-center gap-4 z-10 transition-all hover:bg-white">
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-md border border-gray-200 bg-white px-2.5 py-1.5 flex items-center gap-2 z-10">
         {/* Zoom Controls */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <button
-            className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-600 transition-colors"
+            className="w-8 h-8 rounded-lg hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D71B7]/30 flex items-center justify-center text-slate-600 transition-colors"
             onClick={handleZoomOut}
             title="Zoom Out"
           >
             <FontAwesomeIcon icon={faMagnifyingGlassMinus} />
           </button>
-          <span className="text-sm font-medium w-12 text-center text-gray-700">{zoom}%</span>
+          <span className="text-sm font-semibold w-12 text-center text-slate-700">{zoom}%</span>
           <button
-            className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-600 transition-colors"
+            className="w-8 h-8 rounded-lg hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D71B7]/30 flex items-center justify-center text-slate-600 transition-colors"
             onClick={handleZoomIn}
             title="Zoom In"
           >
@@ -73,32 +71,32 @@ const PreviewArea: FC<PreviewAreaProps> = ({ data, previewRef, isFullscreen, set
           </button>
         </div>
 
-        <div className="w-px h-6 bg-gray-300"></div>
+        <div className="w-px h-6 bg-gray-200"></div>
 
         {/* Page Controls */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <button
-            className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-600 transition-colors disabled:opacity-30"
+            className="w-8 h-8 rounded-lg hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D71B7]/30 flex items-center justify-center text-slate-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
             onClick={() => jumpTo(pageInfo.currentPage - 1)}
             disabled={pageInfo.currentPage <= 1}
             title="Previous Page"
           >
             <FontAwesomeIcon icon={faChevronLeft} />
           </button>
-          <div className="flex items-center text-sm font-medium text-gray-700">
+          <div className="flex items-center text-sm font-medium text-slate-700 px-2">
             <input
               type="text"
-              className="w-8 text-center bg-transparent border-b border-gray-400 focus:border-[#1D71B7] outline-none"
+              className="w-9 h-7 text-center bg-white/75 rounded-md border border-slate-200 focus:border-[#1D71B7] focus:ring-2 focus:ring-[#1D71B7]/10 outline-none"
               value={pageInput}
-              onChange={(e) => setPageInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') jumpTo(Number(pageInput)); }}
-              onBlur={() => jumpTo(Number(pageInput))}
+              onChange={(e) => setPageInput(e.target.value.replace(/[^\d]/g, ""))}
+              onKeyDown={(e) => { if (e.key === 'Enter') handlePageInputCommit(); }}
+              onBlur={handlePageInputCommit}
             />
-            <span className="mx-1">/</span>
+            <span className="mx-1 text-slate-400">/</span>
             <span>{Math.max(1, pageInfo.totalPages)}</span>
           </div>
           <button
-            className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-600 transition-colors disabled:opacity-30"
+            className="w-8 h-8 rounded-lg hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D71B7]/30 flex items-center justify-center text-slate-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
             onClick={() => jumpTo(pageInfo.currentPage + 1)}
             disabled={pageInfo.currentPage >= pageInfo.totalPages}
             title="Next Page"
@@ -107,11 +105,11 @@ const PreviewArea: FC<PreviewAreaProps> = ({ data, previewRef, isFullscreen, set
           </button>
         </div>
 
-        <div className="w-px h-6 bg-gray-300"></div>
+        <div className="w-px h-6 bg-gray-200"></div>
 
         {/* Fullscreen Toggle */}
         <button
-          className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-600 transition-colors"
+          className="w-8 h-8 rounded-lg hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D71B7]/30 flex items-center justify-center text-slate-600 transition-colors"
           onClick={() => setFullscreen(!isFullscreen)}
           title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
         >
