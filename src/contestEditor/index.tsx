@@ -9,7 +9,7 @@ import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFileCode, faLanguage, faUpload, faFileZipper, faX, faImages, faChevronDown, faArrowsDownToLine } from "@fortawesome/free-solid-svg-icons";
+import { faFileCode, faLanguage, faUpload, faFileZipper, faX, faImages, faChevronDown, faArrowsDownToLine, faHistory } from "@fortawesome/free-solid-svg-icons";
 
 import type { ContestWithImages, ImageData } from "@/types/contest";
 import { exampleStatements } from "./exampleStatements";
@@ -17,6 +17,7 @@ import { compileToPdf, compileProblemToPdf, typstInitPromise, registerImages } f
 import { saveConfigToDB, loadConfigFromDB, exportConfig, importConfig, clearDB, saveImageToDB } from "@/utils/indexedDBUtils";
 import { loadPolygonPackage } from "@/utils/polygonConverter";
 import { useToast } from "@/components/ToastProvider";
+import VersionManager from "@/components/VersionManager";
 import { type PreviewHandle } from "./Preview";
 
 import Sidebar from "./Sidebar";
@@ -59,6 +60,7 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
   const [exportDisabled, setExportDisabled] = useState(true);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showVersionManager, setShowVersionManager] = useState(false);
   const [showReorder, setShowReorder] = useState(false);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const [confirmModalContent, setConfirmModalContent] = useState({ title: '', content: '' });
@@ -370,6 +372,7 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
               exportDisabled={exportDisabled}
               onOpenSettings={() => setShowSettings(true)}
               onOpenImages={() => setActiveId('images')}
+              onOpenVersionManager={() => setShowVersionManager(true)}
               previewVisible={previewVisible}
               onTogglePreview={() => setPreviewVisible(!previewVisible)}
             />
@@ -519,10 +522,29 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
                     <FontAwesomeIcon icon={faFileCode} className="text-xl w-6" />
                     <span className="text-base">{t('common:exportConfig')}</span>
                   </button>
+
+                  {/* Version Management */}
+                  <button className="btn btn-outline btn-lg justify-start gap-4 h-14" onClick={() => { setShowSettings(false); setShowVersionManager(true); }}>
+                    <FontAwesomeIcon icon={faHistory} className="text-xl w-6" />
+                    <span className="text-base">{t('messages:versionControl.title')}</span>
+                  </button>
                 </div>
               </div>
               <div className="modal-backdrop" onClick={() => setShowSettings(false)}></div>
             </div>
+          )}
+
+          {/* Version Manager Modal */}
+          {showVersionManager && (
+            <VersionManager
+              currentContest={contestData}
+              onRestore={(contest, _images) => {
+                updateContestData(() => contest);
+                setShowVersionManager(false);
+                showToast(t('messages:versionControl.versionRestored'));
+              }}
+              onClose={() => setShowVersionManager(false)}
+            />
           )}
 
           {/* Reorder Modal */}
@@ -705,10 +727,29 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
                     <FontAwesomeIcon icon={faFileCode} className="text-xl w-6" />
                     <span className="text-base">{t('common:exportConfig')}</span>
                   </button>
+
+                  {/* Version Management */}
+                  <button className="btn btn-outline btn-lg justify-start gap-4 h-14" onClick={() => { setShowSettings(false); setShowVersionManager(true); }}>
+                    <FontAwesomeIcon icon={faHistory} className="text-xl w-6" />
+                    <span className="text-base">{t('messages:versionControl.title')}</span>
+                  </button>
                 </div>
               </div>
               <div className="modal-backdrop" onClick={() => setShowSettings(false)}></div>
             </div>
+          )}
+
+          {/* Version Manager Modal */}
+          {showVersionManager && (
+            <VersionManager
+              currentContest={contestData}
+              onRestore={(contest, _images) => {
+                updateContestData(() => contest);
+                setShowVersionManager(false);
+                showToast(t('messages:versionControl.versionRestored'));
+              }}
+              onClose={() => setShowVersionManager(false)}
+            />
           )}
 
           {/* Reorder Modal */}

@@ -1,6 +1,6 @@
 import { type FC, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faGear, faPlus, faFilePdf, faPenToSquare, faImages, faTrash, faEdit, faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
+import { faGear, faPlus, faFilePdf, faPenToSquare, faImages, faTrash, faEdit, faEye, faEyeSlash, faHistory } from "@fortawesome/free-solid-svg-icons";
 import { useTranslation } from "react-i18next";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -17,6 +17,7 @@ interface SidebarProps {
   exportDisabled: boolean;
   onOpenSettings: () => void;
   onOpenImages: () => void;
+  onOpenVersionManager: () => void;
   previewVisible: boolean;
   onTogglePreview: () => void;
 }
@@ -71,6 +72,7 @@ const Sidebar: FC<SidebarProps> = ({
   exportDisabled,
   onOpenSettings,
   onOpenImages,
+  onOpenVersionManager,
   previewVisible,
   onTogglePreview,
 }) => {
@@ -158,6 +160,13 @@ const Sidebar: FC<SidebarProps> = ({
           title={t('editor:imageManagement')}
         >
           <FontAwesomeIcon icon={faImages} className="text-lg" />
+        </button>
+        <button
+          className="w-10 h-10 rounded-md flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors select-none"
+          onClick={onOpenVersionManager}
+          title={t('messages:versionControl.title')}
+        >
+          <FontAwesomeIcon icon={faHistory} className="text-lg" />
         </button>
         <button
           className="w-10 h-10 rounded-md flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors select-none"
