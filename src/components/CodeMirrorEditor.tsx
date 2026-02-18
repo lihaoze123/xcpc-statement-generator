@@ -1,10 +1,11 @@
 import { useEffect, useRef } from "react";
-import { EditorState } from "@codemirror/state";
+import { EditorState, Prec } from "@codemirror/state";
 import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
 import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
 import { vim } from "@replit/codemirror-vim";
+import { insertFourSpaces, outdentFourSpaces } from "@/utils/codemirrorTab";
 
 import "./CodeMirrorEditor.css";
 
@@ -40,6 +41,10 @@ const CodeMirrorEditor: React.FC<CodeMirrorEditorProps> = ({
   const onChangeRef = useRef<typeof onChange>(onChange);
   const isApplyingExternalValueRef = useRef(false);
 
+  const handleTabKey = (view: EditorView, shift: boolean) => {
+    return shift ? outdentFourSpaces(view) : insertFourSpaces(view);
+  };
+
   useEffect(() => {
     onChangeRef.current = onChange;
   }, [onChange]);
@@ -66,6 +71,14 @@ const CodeMirrorEditor: React.FC<CodeMirrorEditorProps> = ({
       getLanguageExtension(language),
       updateListener,
       EditorView.lineWrapping,
+      Prec.highest(EditorView.domEventHandlers({
+        keydown(event, view) {
+          if (event.key !== "Tab") return false;
+          event.preventDefault();
+          event.stopPropagation();
+          return handleTabKey(view, event.shiftKey);
+        },
+      })),
       EditorView.theme({
         "&": { minHeight },
         ".cm-scroller": { overflow: "auto" },
