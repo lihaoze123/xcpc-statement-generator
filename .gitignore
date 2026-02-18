@@ -2,3 +2,4 @@ node_modules/
 dist/
 CLAUDE.md
 AGENTS.md
+.worktrees/
