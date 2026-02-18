@@ -5,10 +5,16 @@ All notable changes of this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.1] - 2026-02-18
 
 ### Added
 - 单题导出 PDF 功能（侧边栏右键菜单和编辑区工具栏）
+- 响应式移动端布局及底部标签导航
+- 竞赛编辑的版本控制系统（支持历史版本查看与回滚）
+
+### Fixed
+- 移除主容器外边距并改进底部导航栏样式
+- 修复非输入内容可选择的问题
 
 ## [0.2.0] - 2026-02-18
 

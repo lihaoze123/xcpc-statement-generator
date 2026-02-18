@@ -19,6 +19,10 @@ A web-based XCPC contest statement generator that converts Typst/Markdown/LaTeX 
 - **⚡ Real-time Preview**: Instant compilation and preview with WYSIWYG editing
 - **🎨 Professional Typesetting**: Almost pixel-perfect replica of XCPC contest statement styles
 - **🔧 Flexible Configuration**: Support for custom contest information, problem lists, and other metadata
+- **📄 Single Problem Export**: Export individual problems as separate PDF files
+- **📱 Mobile Support**: Responsive layout with bottom navigation for mobile devices
+- **📚 Version Control**: Save, restore, and compare contest versions with diff view
+- **🔍 Vim Mode**: Optional Vim keybindings in the code editor
 
 ## 🚀 Quick Start
 
