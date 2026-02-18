@@ -30,6 +30,7 @@
     "@replit/codemirror-vim": "^6.3.0",
     "allotment": "^1.20.5",
     "axios": "^1.13.2",
+    "diff": "^8.0.3",
     "fontkit": "^2.0.4",
     "i18next": "^25.7.2",
     "jszip": "^3.10.1",
@@ -42,6 +43,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.18",
     "@tailwindcss/typography": "^0.5.19",
+    "@types/diff": "^7.0.2",
     "@types/jszip": "^3.4.0",
     "@types/lodash": "^4.17.15",
     "@types/node": "^24.10.1",

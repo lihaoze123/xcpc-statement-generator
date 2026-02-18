@@ -75,3 +75,42 @@ export interface ContestWithImages {
   problems: Problem[];
   images: ImageData[];
 }
+
+// 导出的图片数据
+export interface ExportedImageData {
+  uuid: string;
+  name: string;
+  data?: string; // base64 encoded
+}
+
+// 版本/快照
+export interface Version {
+  id: string;
+  name: string;
+  description?: string;
+  createdAt: number;
+  branchId: string;
+  parentVersionId?: string;
+  contest: Contest;
+  images: ImageMeta[];
+}
+
+// 分支
+export interface Branch {
+  id: string;
+  name: string;
+  createdAt: number;
+  currentVersionId: string;
+}
+
+// 导出的版本包
+export interface ExportedVersions {
+  type: "xcpc-versions";
+  version: "1.0";
+  exportedAt: number;
+  branches: Branch[];
+  versions: (Omit<Version, "contest" | "images"> & {
+    contest: Contest;
+    images: ExportedImageData[];
+  })[];
+}
