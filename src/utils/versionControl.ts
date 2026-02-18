@@ -3,7 +3,9 @@ import type { Contest, ImageMeta, Version, Branch, ExportedVersions, ExportedIma
 const DB_NAME = "xcpc-statement-gen-db";
 const VERSIONS_STORE = "versions";
 const BRANCHES_STORE = "branches";
-const DB_VERSION = 26;
+const CONFIG_STORE = "contest-config";
+const IMAGES_STORE = "images";
+const DB_VERSION = 29;
 
 const openDB = (): Promise<IDBDatabase> => {
   return new Promise((resolve, reject) => {
@@ -17,6 +19,12 @@ const openDB = (): Promise<IDBDatabase> => {
       }
       if (!db.objectStoreNames.contains(BRANCHES_STORE)) {
         db.createObjectStore(BRANCHES_STORE, { keyPath: "id" });
+      }
+      if (!db.objectStoreNames.contains(CONFIG_STORE)) {
+        db.createObjectStore(CONFIG_STORE);
+      }
+      if (!db.objectStoreNames.contains(IMAGES_STORE)) {
+        db.createObjectStore(IMAGES_STORE, { keyPath: "uuid" });
       }
     };
   });

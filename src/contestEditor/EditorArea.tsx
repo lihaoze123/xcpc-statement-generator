@@ -5,6 +5,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTrash, faInbox, faCopy, faChevronDown, faFilePdf } from "@fortawesome/free-solid-svg-icons";
 import { saveImageToDB, deleteImageFromDB } from "@/utils/indexedDBUtils";
 import { useToast } from "@/components/ToastProvider";
+import SyncStatusIndicator from "@/components/SyncStatusIndicator";
 import TabBar, { type TabId } from "@/components/TabBar";
 import CodeMirrorEditor from "@/components/CodeMirrorEditor";
 import SamplesEditor from "@/components/SamplesEditor";
@@ -16,6 +17,9 @@ interface EditorAreaProps {
   onDeleteProblem: (key: string) => void;
   onExportCurrentProblem?: () => void;
   vimMode?: boolean;
+  syncStatus?: 'synced' | 'syncing' | 'pending' | 'disabled';
+  lastSyncTime?: number;
+  onSyncStatusClick?: () => void;
 }
 
 interface ConfigFormProps {
@@ -264,7 +268,10 @@ const SingleProblemEditor: FC<{
   onDelete: () => void;
   onExport?: () => void;
   vimMode?: boolean;
-}> = ({ problem, index, onUpdate, onDelete, onExport, vimMode = false }) => {
+  syncStatus?: 'synced' | 'syncing' | 'pending' | 'disabled';
+  lastSyncTime?: number;
+  onSyncStatusClick?: () => void;
+}> = ({ problem, index, onUpdate, onDelete, onExport, vimMode = false, syncStatus = 'disabled', lastSyncTime, onSyncStatusClick }) => {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<TabId>("description");
 
@@ -337,6 +344,11 @@ const SingleProblemEditor: FC<{
           {String.fromCharCode(65 + index)}. {problem.problem.display_name}
         </h2>
         <div className="flex items-center gap-2">
+          <SyncStatusIndicator
+            status={syncStatus}
+            lastSyncTime={lastSyncTime}
+            onClick={onSyncStatusClick}
+          />
           {onExport && (
             <button
               className="btn btn-sm btn-ghost"
@@ -387,7 +399,7 @@ const SingleProblemEditor: FC<{
   );
 };
 
-const EditorArea: FC<EditorAreaProps> = ({ contestData, updateContestData, activeId, onDeleteProblem, onExportCurrentProblem, vimMode = false }) => {
+const EditorArea: FC<EditorAreaProps> = ({ contestData, updateContestData, activeId, onDeleteProblem, onExportCurrentProblem, vimMode = false, syncStatus = 'disabled', lastSyncTime, onSyncStatusClick }) => {
   if (activeId === 'config') {
     return (
       <div className="h-full overflow-y-auto bg-white custom-scroll">
@@ -417,6 +429,9 @@ const EditorArea: FC<EditorAreaProps> = ({ contestData, updateContestData, activ
           onDelete={() => onDeleteProblem(problem.key!)}
           onExport={onExportCurrentProblem}
           vimMode={vimMode}
+          syncStatus={syncStatus}
+          lastSyncTime={lastSyncTime}
+          onSyncStatusClick={onSyncStatusClick}
         />
       </div>
     );
