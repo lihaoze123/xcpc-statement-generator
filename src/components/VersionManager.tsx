@@ -98,7 +98,11 @@ const VersionManager: FC<VersionManagerProps> = ({ currentContest, onRestore, on
 
   // Handle save version
   const handleSaveVersion = async () => {
-    if (!versionName.trim() || !selectedBranchId) return;
+    if (!selectedBranchId) {
+      showToast(t("messages:versionControl.needBranch"), "error");
+      return;
+    }
+    if (!versionName.trim()) return;
 
     const contest: Contest = {
       meta: currentContest.meta,

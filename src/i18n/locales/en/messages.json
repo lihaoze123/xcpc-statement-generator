@@ -67,6 +67,7 @@
     "branchBase": "Based on",
     "branchBaseEmpty": "Create from empty",
     "branchBaseVersion": "Create from version",
-    "selectVersion": "Select version"
+    "selectVersion": "Select version",
+    "needBranch": "Please create a branch first"
   }
 }
