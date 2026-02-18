@@ -67,6 +67,7 @@
     "branchBase": "基于",
     "branchBaseEmpty": "空白创建",
     "branchBaseVersion": "从版本创建",
-    "selectVersion": "选择版本"
+    "selectVersion": "选择版本",
+    "needBranch": "请先创建分支"
   }
 }
