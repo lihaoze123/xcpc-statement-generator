@@ -3,7 +3,7 @@ import type { Contest, ContestWithImages } from "@/types/contest";
 const DB_NAME = "xcpc-statement-gen-db";
 const CONFIG_STORE = "contest-config";
 const IMAGES_STORE = "images";
-const DB_VERSION = 25; // Bumped to recreate images store with correct schema
+const DB_VERSION = 26; // Must match versionControl.ts
 
 // Image blob storage type
 interface StoredImageData {
