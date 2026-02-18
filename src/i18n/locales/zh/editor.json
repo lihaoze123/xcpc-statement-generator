@@ -42,5 +42,11 @@
   "showPreview": "显示预览",
   "hidePreview": "隐藏预览",
   "exportSuccess": "题目导出成功",
-  "exportFailed": "题目导出失败"
+  "exportFailed": "题目导出失败",
+  "templateEditor": "模板编辑",
+  "showDefaultTemplate": "查看默认模板",
+  "hideDefaultTemplate": "隐藏默认模板",
+  "defaultTemplate": "默认模板（只读参考）",
+  "resetToDefault": "重置为默认",
+  "templateHelp": "模板需要定义 contest-conf 函数接收参数：title(标题)、subtitle(副标题)、author(作者)、date(日期)、problems(题目列表)、language(语言)、titlepage-language、problem-language、enable-titlepage、enable-header-footer、enable-problem-list。详见默认模板。"
 }

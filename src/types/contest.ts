@@ -67,6 +67,7 @@ export interface Contest {
   meta: ContestMetadata;
   problems: Problem[];
   images?: ImageMeta[];
+  template?: string; // 用户自定义模板
 }
 
 // 比赛配置（运行时格式，包含 Blob URL）
@@ -74,6 +75,7 @@ export interface ContestWithImages {
   meta: ContestMetadata;
   problems: Problem[];
   images: ImageData[];
+  template?: string; // 用户自定义模板
 }
 
 // 导出的图片数据

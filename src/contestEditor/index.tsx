@@ -25,6 +25,7 @@ import EditorArea from "./EditorArea";
 import PreviewArea from "./PreviewArea";
 import MobileToolbar from "./MobileToolbar";
 import MobileTabBar from "./MobileTabBar";
+import TemplateEditor from "./TemplateEditor";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 import "./index.css";
@@ -61,6 +62,7 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showVersionManager, setShowVersionManager] = useState(false);
+  const [showTemplateEditor, setShowTemplateEditor] = useState(false);
   const [showReorder, setShowReorder] = useState(false);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const [confirmModalContent, setConfirmModalContent] = useState({ title: '', content: '' });
@@ -373,6 +375,7 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
               onOpenSettings={() => setShowSettings(true)}
               onOpenImages={() => setActiveId('images')}
               onOpenVersionManager={() => setShowVersionManager(true)}
+              onOpenTemplate={() => setShowTemplateEditor(true)}
               previewVisible={previewVisible}
               onTogglePreview={() => setPreviewVisible(!previewVisible)}
             />
@@ -531,6 +534,24 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
                 </div>
               </div>
               <div className="modal-backdrop" onClick={() => setShowSettings(false)}></div>
+            </div>
+          )}
+
+          {/* Template Editor Modal */}
+          {showTemplateEditor && (
+            <div className="modal modal-open">
+              <div className="modal-box max-w-4xl w-full h-[600px] p-4">
+                <TemplateEditor
+                  template={contestData.template}
+                  onSave={(template) => {
+                    updateContestData((draft) => { draft.template = template; });
+                    setShowTemplateEditor(false);
+                    showToast(t('editor:templateEditor') + ' ' + t('common:save'), 'success');
+                  }}
+                  onClose={() => setShowTemplateEditor(false)}
+                />
+              </div>
+              <div className="modal-backdrop" onClick={() => setShowTemplateEditor(false)}></div>
             </div>
           )}
 
@@ -736,6 +757,24 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
                 </div>
               </div>
               <div className="modal-backdrop" onClick={() => setShowSettings(false)}></div>
+            </div>
+          )}
+
+          {/* Template Editor Modal */}
+          {showTemplateEditor && (
+            <div className="modal modal-open">
+              <div className="modal-box max-w-4xl w-full h-[600px] p-4">
+                <TemplateEditor
+                  template={contestData.template}
+                  onSave={(template) => {
+                    updateContestData((draft) => { draft.template = template; });
+                    setShowTemplateEditor(false);
+                    showToast(t('editor:templateEditor') + ' ' + t('common:save'), 'success');
+                  }}
+                  onClose={() => setShowTemplateEditor(false)}
+                />
+              </div>
+              <div className="modal-backdrop" onClick={() => setShowTemplateEditor(false)}></div>
             </div>
           )}
 

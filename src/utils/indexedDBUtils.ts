@@ -37,6 +37,7 @@ export const saveConfigToDB = async (data: ContestWithImages): Promise<void> => 
     meta: data.meta,
     problems: data.problems,
     images: data.images.map((img) => ({ uuid: img.uuid, name: img.name })),
+    template: data.template,
   };
   return new Promise((resolve, reject) => {
     const tx = db.transaction([CONFIG_STORE], "readwrite");
@@ -170,6 +171,7 @@ interface ExportedConfig {
   meta: Contest["meta"];
   problems: Contest["problems"];
   images: ExportedImageData[];
+  template?: string;
 }
 
 export const exportConfig = async (data: ContestWithImages): Promise<string> => {
@@ -193,6 +195,7 @@ export const exportConfig = async (data: ContestWithImages): Promise<string> => 
     meta: data.meta,
     problems: data.problems,
     images: imageData,
+    template: data.template,
   };
 
   return JSON.stringify(exportData, null, 2);
@@ -223,6 +226,7 @@ export const importConfig = (json: string): {
       uuid: img.uuid,
       name: img.name,
     })),
+    template: importData.template,
   };
 
   return { data, images };

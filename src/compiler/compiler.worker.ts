@@ -126,7 +126,7 @@ async function addImagesToFilesystem(contest: ContestWithImages): Promise<void> 
   }
 }
 
-function buildTypstDocument(contest: ContestWithImages, problemKey?: string): string {
+function buildTypstDocument(contest: ContestWithImages, problemKey?: string, userTemplate?: string): string {
   let problems = contest.problems;
 
   // 如果指定了 problemKey，则只编译该题目
@@ -161,9 +161,7 @@ function buildTypstDocument(contest: ContestWithImages, problemKey?: string): st
     problemLanguage: contest.meta.problem_language || "auto"
   };
 
-  return `#import "/lib.typ": contest-conf
-
-#show: contest-conf.with(
+  const showRule = `#show: contest-conf.with(
   title: "${escapeTypstString(data.title)}",
   subtitle: "${escapeTypstString(data.subtitle)}",
   author: "${escapeTypstString(data.author)}",
@@ -188,6 +186,13 @@ function buildTypstDocument(contest: ContestWithImages, problemKey?: string): st
   titlepage-language: ${data.titlepageLanguage === "auto" ? "auto" : `"${data.titlepageLanguage}"`},
   problem-language: ${data.problemLanguage === "auto" ? "auto" : `"${data.problemLanguage}"`}
 )`;
+
+  if (userTemplate) {
+    return userTemplate + "\n\n" + showRule;
+  }
+
+  return `#import "/lib.typ": contest-conf
+` + showRule;
 }
 
 async function compileToPdf(contest: ContestWithImages, problemKey?: string): Promise<Uint8Array> {
@@ -196,7 +201,7 @@ async function compileToPdf(contest: ContestWithImages, problemKey?: string): Pr
   // Add images to virtual filesystem
   await addImagesToFilesystem(contest);
 
-  const doc = buildTypstDocument(contest, problemKey);
+  const doc = buildTypstDocument(contest, problemKey, contest.template);
   $typst.addSource("/main.typ", doc);
 
   const pdf = await $typst.pdf({ mainFilePath: "/main.typ" });
@@ -210,7 +215,7 @@ async function renderToSvg(contest: ContestWithImages): Promise<string> {
   // Add images to virtual filesystem
   await addImagesToFilesystem(contest);
 
-  const doc = buildTypstDocument(contest);
+  const doc = buildTypstDocument(contest, undefined, contest.template);
   $typst.addSource("/main.typ", doc);
 
   const svg = await $typst.svg({ mainFilePath: "/main.typ" });
