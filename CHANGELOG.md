@@ -5,6 +5,18 @@ All notable changes of this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2] - 2026-02-19
+
+### Added
+- 云同步功能 - 支持将竞赛数据同步到云端（阿里云 OSS、腾讯云 COS、AWS S3）
+- GitHub 目录支持 - 云同步时可选择 GitHub 仓库目录
+- Tab/Shift+Tab 支持 - CodeMirror 编辑器的键盘导航
+- 自定义模板编辑器 - 支持在设置中编辑自定义 Typst 模板
+- 预览缩放功能 - Canvas 渲染预览并支持缩放
+
+### Fixed
+- 保存版本时未选择分支的错误提示
+
 ## [0.2.1] - 2026-02-18
 
 ### Added

@@ -22,6 +22,7 @@ A web-based XCPC contest statement generator that converts Typst/Markdown/LaTeX 
 - **📄 Single Problem Export**: Export individual problems as separate PDF files
 - **📱 Mobile Support**: Responsive layout with bottom navigation for mobile devices
 - **📚 Version Control**: Save, restore, and compare contest versions with diff view
+- **☁️ Cloud Sync**: Sync contest data to cloud storage (Aliyun OSS, Tencent Cloud COS, AWS S3, GitHub)
 - **🔍 Vim Mode**: Optional Vim keybindings in the code editor
 
 ## 🚀 Quick Start
