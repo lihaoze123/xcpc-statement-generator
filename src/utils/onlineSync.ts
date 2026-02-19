@@ -124,16 +124,6 @@ const createGitHubAdapter = (config: OnlineSyncConfig): StorageAdapter => {
   // 待提交的缓存
   const pendingFiles = new Map<string, { content: string; isBlob: boolean }>();
 
-  const getFileSha = async (path: string) => {
-    try {
-      const res = await octokit.repos.getContent({ owner, repo, path });
-      return (res.data as any)?.sha;
-    } catch (e: any) {
-      if (e?.status === 404) return undefined;
-      throw e;
-    }
-  };
-
   // 提交所有缓存的文件（单次 commit）
   const commitAll = async (message: string) => {
     if (pendingFiles.size === 0) return;

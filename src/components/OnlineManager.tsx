@@ -3,8 +3,6 @@ import { useTranslation } from "react-i18next";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faX,
-  faCloudArrowUp,
-  faCloudArrowDown,
   faGear,
 } from "@fortawesome/free-solid-svg-icons";
 import type { OnlineSyncConfig, OnlineSyncSettings, ContestWithImages } from "@/types/contest";
