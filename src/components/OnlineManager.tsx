@@ -6,9 +6,6 @@ import {
   faCloudArrowUp,
   faCloudArrowDown,
   faGear,
-  faCheck,
-  faSpinner,
-  faExclamationTriangle,
 } from "@fortawesome/free-solid-svg-icons";
 import type { OnlineSyncConfig, OnlineSyncSettings, ContestWithImages } from "@/types/contest";
 import {
@@ -70,6 +67,7 @@ const OnlineManager: FC<OnlineManagerProps> = ({
   // GitHub 配置
   const [githubToken, setGithubToken] = useState("");
   const [githubRepo, setGithubRepo] = useState("");
+  const [githubDirectory, setGithubDirectory] = useState("");
 
   // Cloudflare R2 配置
   const [r2AccessKeyId, setR2AccessKeyId] = useState("");
@@ -96,7 +94,7 @@ const OnlineManager: FC<OnlineManagerProps> = ({
       case "oss":
         return { accessKeyId: ossAccessKeyId, accessKeySecret: ossAccessKeySecret, bucket: ossBucket, region: ossRegion };
       case "github":
-        return { token: githubToken, repo: githubRepo };
+        return { token: githubToken, repo: githubRepo, directory: githubDirectory };
       case "r2":
         return { accessKeyId: r2AccessKeyId, secretAccessKey: r2SecretAccessKey, bucket: r2Bucket, accountId: r2AccountId };
     }
@@ -116,6 +114,7 @@ const OnlineManager: FC<OnlineManagerProps> = ({
     } else if (nextPlatform === "github") {
       setGithubToken(draft?.token || "");
       setGithubRepo(draft?.repo || "");
+      setGithubDirectory(draft?.directory || "");
     } else if (nextPlatform === "r2") {
       setR2AccessKeyId(draft?.accessKeyId || "");
       setR2SecretAccessKey(draft?.secretAccessKey || "");
@@ -174,6 +173,7 @@ const OnlineManager: FC<OnlineManagerProps> = ({
           setPlatform("github");
           setGithubToken(cfg.token || "");
           setGithubRepo(cfg.repo || "");
+          setGithubDirectory(cfg.directory || "");
         } else if (cfg.platform === "r2") {
           setPlatform("r2");
           setR2AccessKeyId(cfg.accessKeyId || "");
@@ -222,6 +222,7 @@ const OnlineManager: FC<OnlineManagerProps> = ({
         platform: "github",
         token: githubToken,
         repo: githubRepo,
+        directory: githubDirectory || undefined,
       };
     } else if (platform === "r2") {
       if (!r2AccessKeyId || !r2SecretAccessKey || !r2Bucket || !r2AccountId) {
@@ -326,7 +327,7 @@ const OnlineManager: FC<OnlineManagerProps> = ({
       await uploadToOnline(settings.config, contestData.meta.title, {
         contest: {
           meta: contestData.meta,
-          problems: contestData.problems,
+          problems: contestData.problems.map(({ key, ...rest }) => rest),
           images: contestData.images.map((img) => ({ uuid: img.uuid, name: img.name })),
           template: contestData.template,
         },
@@ -374,7 +375,10 @@ const OnlineManager: FC<OnlineManagerProps> = ({
       // 保存配置到数据库
       await saveConfigToDB({
         meta: data.contest.meta,
-        problems: data.contest.problems,
+        problems: data.contest.problems.map((p) => ({
+          ...p,
+          key: p.key || crypto.randomUUID(),
+        })),
         images: Array.from(data.images.entries() as IterableIterator<[string, Blob]>).map(([uuid, blob]) => ({
           uuid,
           name: data.contest.images?.find((img) => img.uuid === uuid)?.name || uuid,
@@ -407,7 +411,10 @@ const OnlineManager: FC<OnlineManagerProps> = ({
 
       onDataImported({
         meta: data.contest.meta,
-        problems: data.contest.problems,
+        problems: data.contest.problems.map((p) => ({
+          ...p,
+          key: p.key || crypto.randomUUID(),
+        })),
         images: imageData,
         template: data.contest.template,
       });
@@ -443,67 +450,49 @@ const OnlineManager: FC<OnlineManagerProps> = ({
 
   if (!isOpen) return null;
 
+  const platformName = (p: string) => {
+    switch (p) {
+      case "cos": return t("online:tencent_cos");
+      case "oss": return "阿里云 OSS";
+      case "github": return "GitHub";
+      case "r2": return "Cloudflare R2";
+      default: return p;
+    }
+  };
+
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg w-full max-w-md">
         {/* 头部 */}
-        <div className="flex items-center justify-between p-4 border-b sticky top-0 bg-white z-10">
-          <h2 className="text-xl font-bold flex items-center gap-2">
-            <FontAwesomeIcon icon={faCloudArrowUp} />
-            {t("online:title")}
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 p-2"
-          >
+        <div className="flex items-center justify-between p-4 border-b">
+          <h2 className="font-semibold">{t("online:title")}</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <FontAwesomeIcon icon={faX} />
           </button>
         </div>
 
         {/* 内容 */}
-        <div className="p-6 space-y-6">
-          {/* 配置状�?*/}
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <div className="flex items-center justify-between mb-2">
-              <span className="font-medium">{t("online:status")}</span>
-              {settings.enabled && settings.config ? (
-                <span className="text-green-600 flex items-center gap-2">
-                  <FontAwesomeIcon icon={faCheck} />
-                  {t("online:configured")}
-                </span>
-              ) : (
-                <span className="text-orange-600 flex items-center gap-2">
-                  <FontAwesomeIcon icon={faExclamationTriangle} />
-                  {t("online:not_configured")}
-                </span>
-              )}
-            </div>
-            {settings.enabled && settings.config && (
-              <div className="text-sm text-gray-600 space-y-1">
-                <p>
-                  {t("online:platform")}: {
-                    settings.config.platform === "cos" ? t("online:tencent_cos") :
-                    settings.config.platform === "oss" ? "阿里云 OSS" :
-                    settings.config.platform === "github" ? "GitHub" :
-                    settings.config.platform === "r2" ? "Cloudflare R2" : ""
-                  }
-                </p>
+        <div className="p-4 space-y-4">
+          {/* 状态显示 */}
+          <div className="text-sm">
+            {settings.enabled && settings.config ? (
+              <div className="text-green-600 flex items-center gap-2">
+                <span>{platformName(settings.config.platform)}</span>
                 {settings.lastSyncTime && (
-                  <p>
-                    {t("online:last_sync")}:{" "}
-                    {new Date(settings.lastSyncTime).toLocaleString()}
-                  </p>
+                  <span className="text-gray-400">· {new Date(settings.lastSyncTime).toLocaleDateString()}</span>
                 )}
               </div>
+            ) : (
+              <span className="text-gray-400">{t("online:not_configured")}</span>
             )}
           </div>
 
           {/* 配置区域 */}
           {!showConfig ? (
-            <div className="flex gap-3">
+            <div className="space-y-2">
               <button
                 onClick={() => setShowConfig(true)}
-                className="flex-1 py-2 px-4 bg-gray-100 hover:bg-gray-200 rounded-lg flex items-center justify-center gap-2"
+                className="w-full py-2 px-4 border rounded hover:bg-gray-50 flex items-center justify-center gap-2"
               >
                 <FontAwesomeIcon icon={faGear} />
                 {settings.enabled ? t("online:edit_config") : t("online:configure")}
@@ -512,411 +501,106 @@ const OnlineManager: FC<OnlineManagerProps> = ({
                 <button
                   onClick={handleTestConnection}
                   disabled={isTesting}
-                  className="flex-1 py-2 px-4 bg-blue-100 hover:bg-blue-200 rounded-lg disabled:opacity-50"
+                  className="w-full py-2 px-4 border rounded hover:bg-gray-50 disabled:opacity-50"
                 >
-                  {isTesting ? (
-                    <>
-                      <FontAwesomeIcon icon={faSpinner} spin />
-                      {" " + t("online:testing")}
-                    </>
-                  ) : (
-                    t("online:test_connection")
-                  )}
+                  {isTesting ? t("online:testing") : t("online:test_connection")}
                 </button>
               )}
             </div>
           ) : (
-            <div className="space-y-4 border p-4 rounded-lg">
-              <h3 className="font-medium">{t("online:sync_config")}</h3>
-
-              {/* 平台选择 */}
+            <div className="space-y-3">
               <div>
-                <label className="block text-sm font-medium mb-2">
-                  {t("online:select_platform")}
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <label className="flex items-center p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
-                    <input
-                      type="radio"
-                      value="cos"
-                      checked={platform === "cos"}
-                      onChange={(e) => handlePlatformChange(e.target.value as any)}
-                      className="mr-2"
-                    />
-                    <span>{t("online:tencent_cos")}</span>
-                  </label>
-                  <label className="flex items-center p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
-                    <input
-                      type="radio"
-                      value="oss"
-                      checked={platform === "oss"}
-                      onChange={(e) => handlePlatformChange(e.target.value as any)}
-                      className="mr-2"
-                    />
-                    <span>阿里云 OSS</span>
-                  </label>
-                  <label className="flex items-center p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
-                    <input
-                      type="radio"
-                      value="github"
-                      checked={platform === "github"}
-                      onChange={(e) => handlePlatformChange(e.target.value as any)}
-                      className="mr-2"
-                    />
-                    <span>GitHub</span>
-                  </label>
-                  <label className="flex items-center p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
-                    <input
-                      type="radio"
-                      value="r2"
-                      checked={platform === "r2"}
-                      onChange={(e) => handlePlatformChange(e.target.value as any)}
-                      className="mr-2"
-                    />
-                    <span>Cloudflare R2</span>
-                  </label>
+                <label className="block text-sm text-gray-600 mb-2">{t("online:select_platform")}</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {["cos", "oss", "github", "r2"].map((p) => (
+                    <label key={p} className="flex items-center p-2 border rounded cursor-pointer hover:bg-gray-50">
+                      <input
+                        type="radio"
+                        value={p}
+                        checked={platform === p}
+                        onChange={(e) => handlePlatformChange(e.target.value as any)}
+                        className="mr-2"
+                      />
+                      <span className="text-sm">{platformName(p)}</span>
+                    </label>
+                  ))}
                 </div>
               </div>
 
               {/* COS 配置 */}
               {platform === "cos" && (
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      Secret ID
-                    </label>
-                    <input
-                      type="text"
-                      value={cosSecretId}
-                      onChange={(e) => setCosSecretId(e.target.value)}
-                      className="w-full px-3 py-2 border rounded-lg"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      Secret Key
-                    </label>
-                    <input
-                      type="password"
-                      value={cosSecretKey}
-                      onChange={(e) => setCosSecretKey(e.target.value)}
-                      className="w-full px-3 py-2 border rounded-lg"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      Bucket
-                    </label>
-                    <input
-                      type="text"
-                      value={cosBucket}
-                      onChange={(e) => setCosBucket(e.target.value)}
-                      placeholder="bucket-1234567890"
-                      className="w-full px-3 py-2 border rounded-lg"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      Region
-                    </label>
-                    <input
-                      type="text"
-                      value={cosRegion}
-                      onChange={(e) => setCosRegion(e.target.value)}
-                      placeholder="ap-guangzhou"
-                      className="w-full px-3 py-2 border rounded-lg"
-                    />
-                  </div>
-                  <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded space-y-1">
-                    <div>
-                      获取 Secret ID/Key：
-                      <a
-                        href="https://console.cloud.tencent.com/cam/capi"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="ml-1 text-blue-600 hover:underline"
-                      >
-                        https://console.cloud.tencent.com/cam/capi
-                      </a>
-                    </div>
-                    <div>
-                      获取 Bucket/Region：
-                      <a
-                        href="https://console.cloud.tencent.com/cos/bucket"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="ml-1 text-blue-600 hover:underline"
-                      >
-                        https://console.cloud.tencent.com/cos/bucket
-                      </a>
-                    </div>
-                  </div>
+                <div className="space-y-2">
+                  <input type="text" placeholder="Secret ID" value={cosSecretId} onChange={(e) => setCosSecretId(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
+                  <input type="password" placeholder="Secret Key" value={cosSecretKey} onChange={(e) => setCosSecretKey(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
+                  <input type="text" placeholder="Bucket" value={cosBucket} onChange={(e) => setCosBucket(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
+                  <input type="text" placeholder="Region (如 ap-guangzhou)" value={cosRegion} onChange={(e) => setCosRegion(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
                 </div>
               )}
 
               {/* OSS 配置 */}
               {platform === "oss" && (
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      Access Key ID
-                    </label>
-                    <input
-                      type="text"
-                      value={ossAccessKeyId}
-                      onChange={(e) => setOssAccessKeyId(e.target.value)}
-                      className="w-full px-3 py-2 border rounded-lg"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      Access Key Secret
-                    </label>
-                    <input
-                      type="password"
-                      value={ossAccessKeySecret}
-                      onChange={(e) => setOssAccessKeySecret(e.target.value)}
-                      className="w-full px-3 py-2 border rounded-lg"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      Bucket
-                    </label>
-                    <input
-                      type="text"
-                      value={ossBucket}
-                      onChange={(e) => setOssBucket(e.target.value)}
-                      placeholder="my-bucket"
-                      className="w-full px-3 py-2 border rounded-lg"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      Region
-                    </label>
-                    <input
-                      type="text"
-                      value={ossRegion}
-                      onChange={(e) => setOssRegion(e.target.value)}
-                      placeholder="oss-cn-hangzhou"
-                      className="w-full px-3 py-2 border rounded-lg"
-                    />
-                  </div>
-                  <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded space-y-1">
-                    <div>
-                      获取 Access Key：
-                      <a
-                        href="https://ram.console.aliyun.com/manage/ak"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="ml-1 text-blue-600 hover:underline"
-                      >
-                        https://ram.console.aliyun.com/manage/ak
-                      </a>
-                    </div>
-                    <div>
-                      获取 Bucket/Region：
-                      <a
-                        href="https://oss.console.aliyun.com/bucket"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="ml-1 text-blue-600 hover:underline"
-                      >
-                        https://oss.console.aliyun.com/bucket
-                      </a>
-                    </div>
-                  </div>
+                <div className="space-y-2">
+                  <input type="text" placeholder="Access Key ID" value={ossAccessKeyId} onChange={(e) => setOssAccessKeyId(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
+                  <input type="password" placeholder="Access Key Secret" value={ossAccessKeySecret} onChange={(e) => setOssAccessKeySecret(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
+                  <input type="text" placeholder="Bucket" value={ossBucket} onChange={(e) => setOssBucket(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
+                  <input type="text" placeholder="Region (如 oss-cn-hangzhou)" value={ossRegion} onChange={(e) => setOssRegion(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
                 </div>
               )}
 
               {/* GitHub 配置 */}
               {platform === "github" && (
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      Personal Access Token
-                    </label>
-                    <input
-                      type="password"
-                      value={githubToken}
-                      onChange={(e) => setGithubToken(e.target.value)}
-                      placeholder="ghp_xxxxxxxxxxxx"
-                      className="w-full px-3 py-2 border rounded-lg"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      Repository (owner/repo)
-                    </label>
-                    <input
-                      type="text"
-                      value={githubRepo}
-                      onChange={(e) => setGithubRepo(e.target.value)}
-                      placeholder="username/xcpc-backup"
-                      className="w-full px-3 py-2 border rounded-lg"
-                    />
-                  </div>
-                  <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
-                    获取 Personal Access Token：
-                    <a
-                      href="https://github.com/settings/tokens"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="ml-1 text-blue-600 hover:underline"
-                    >
-                      https://github.com/settings/tokens
-                    </a>
-                  </div>
+                <div className="space-y-2">
+                  <input type="password" placeholder="Personal Access Token" value={githubToken} onChange={(e) => setGithubToken(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
+                  <input type="text" placeholder="Repository (owner/repo)" value={githubRepo} onChange={(e) => setGithubRepo(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
+                  <input type="text" placeholder="Directory (可选, 如 my-contests)" value={githubDirectory} onChange={(e) => setGithubDirectory(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
                 </div>
               )}
 
-              {/* Cloudflare R2 配置 */}
+              {/* R2 配置 */}
               {platform === "r2" && (
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      Access Key ID
-                    </label>
-                    <input
-                      type="text"
-                      value={r2AccessKeyId}
-                      onChange={(e) => setR2AccessKeyId(e.target.value)}
-                      className="w-full px-3 py-2 border rounded-lg"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      Secret Access Key
-                    </label>
-                    <input
-                      type="password"
-                      value={r2SecretAccessKey}
-                      onChange={(e) => setR2SecretAccessKey(e.target.value)}
-                      className="w-full px-3 py-2 border rounded-lg"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      Bucket
-                    </label>
-                    <input
-                      type="text"
-                      value={r2Bucket}
-                      onChange={(e) => setR2Bucket(e.target.value)}
-                      placeholder="my-bucket"
-                      className="w-full px-3 py-2 border rounded-lg"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      Account ID
-                    </label>
-                    <input
-                      type="text"
-                      value={r2AccountId}
-                      onChange={(e) => setR2AccountId(e.target.value)}
-                      className="w-full px-3 py-2 border rounded-lg"
-                    />
-                  </div>
-                  <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded space-y-1">
-                    <div>
-                      获取 R2 API 令牌：
-                      <a
-                        href="https://dash.cloudflare.com/?to=/:account/r2/api-tokens"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="ml-1 text-blue-600 hover:underline"
-                      >
-                        https://dash.cloudflare.com/?to=/:account/r2/api-tokens
-                      </a>
-                    </div>
-                    <div>
-                      获取 Bucket/Account ID：
-                      <a
-                        href="https://dash.cloudflare.com/?to=/:account/r2"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="ml-1 text-blue-600 hover:underline"
-                      >
-                        https://dash.cloudflare.com/?to=/:account/r2
-                      </a>
-                    </div>
-                  </div>
+                <div className="space-y-2">
+                  <input type="text" placeholder="Access Key ID" value={r2AccessKeyId} onChange={(e) => setR2AccessKeyId(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
+                  <input type="password" placeholder="Secret Access Key" value={r2SecretAccessKey} onChange={(e) => setR2SecretAccessKey(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
+                  <input type="text" placeholder="Bucket" value={r2Bucket} onChange={(e) => setR2Bucket(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
+                  <input type="text" placeholder="Account ID" value={r2AccountId} onChange={(e) => setR2AccountId(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
                 </div>
               )}
 
-              {/* 配置按钮 */}
-              <div className="flex gap-3">
-                <button
-                  onClick={saveSettings}
-                  className="flex-1 py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
-                >
+              <div className="flex gap-2">
+                <button onClick={saveSettings} className="flex-1 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
                   {t("online:save_config")}
                 </button>
-                <button
-                  onClick={() => setShowConfig(false)}
-                  className="flex-1 py-2 px-4 bg-gray-200 hover:bg-gray-300 rounded-lg"
-                >
+                <button onClick={() => setShowConfig(false)} className="flex-1 py-2 border rounded hover:bg-gray-50 text-sm">
                   {t("common:cancel")}
                 </button>
               </div>
             </div>
           )}
 
-          {/* 自动同步选项 */}
+          {/* 自动同步 */}
           {settings.enabled && settings.config && (
-            <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
-              <span className="font-medium">{t("online:auto_sync")}</span>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={settings.autoSync}
-                  onChange={toggleAutoSync}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-              </label>
+            <div className="flex items-center justify-between py-2 border-t">
+              <span className="text-sm">{t("online:auto_sync")}</span>
+              <input type="checkbox" checked={settings.autoSync} onChange={toggleAutoSync} className="toggle toggle-sm" />
             </div>
           )}
 
           {/* 同步操作按钮 */}
           {settings.enabled && settings.config && (
-            <div className="space-y-3">
+            <div className="flex gap-2 pt-2 border-t">
               <button
                 onClick={handleUpload}
                 disabled={isUploading}
-                className="w-full py-3 px-4 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 py-2 border rounded hover:bg-gray-50 disabled:opacity-50 text-sm"
               >
-                {isUploading ? (
-                  <>
-                    <FontAwesomeIcon icon={faSpinner} spin />
-                    {t("online:uploading")}
-                  </>
-                ) : (
-                  <>
-                    <FontAwesomeIcon icon={faCloudArrowUp} />
-                    {t("online:upload_to_cloud")}
-                  </>
-                )}
+                {isUploading ? t("online:uploading") : t("online:upload_to_cloud")}
               </button>
-
               <button
                 onClick={handleDownload}
                 disabled={isDownloading}
-                className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 py-2 border rounded hover:bg-gray-50 disabled:opacity-50 text-sm"
               >
-                {isDownloading ? (
-                  <>
-                    <FontAwesomeIcon icon={faSpinner} spin />
-                    {t("online:downloading")}
-                  </>
-                ) : (
-                  <>
-                    <FontAwesomeIcon icon={faCloudArrowDown} />
-                    {t("online:download_from_cloud")}
-                  </>
-                )}
+                {isDownloading ? t("online:downloading") : t("online:download_from_cloud")}
               </button>
             </div>
           )}
@@ -924,13 +608,13 @@ const OnlineManager: FC<OnlineManagerProps> = ({
       </div>
 
       {showConflictPrompt && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-5">
-            <h3 className="text-lg font-semibold mb-2">检测到云端已有同名数据</h3>
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-[60]">
+          <div className="bg-white rounded-lg w-full max-w-sm p-4">
+            <h3 className="font-semibold mb-2">检测到云端已有同名数据</h3>
             <p className="text-sm text-gray-600 mb-4">请选择使用云端内容，或用本地内容覆盖云端。</p>
             <div className="flex justify-end gap-2">
               <button
-                className="btn btn-ghost"
+                className="px-3 py-1.5 border rounded text-sm hover:bg-gray-50"
                 onClick={() => {
                   setShowConflictPrompt(false);
                   conflictResolverRef.current?.("cancel");
@@ -940,7 +624,7 @@ const OnlineManager: FC<OnlineManagerProps> = ({
                 {t("common:cancel")}
               </button>
               <button
-                className="btn btn-outline"
+                className="px-3 py-1.5 border rounded text-sm hover:bg-gray-50"
                 onClick={() => {
                   setShowConflictPrompt(false);
                   conflictResolverRef.current?.("cloud");
@@ -950,7 +634,7 @@ const OnlineManager: FC<OnlineManagerProps> = ({
                 使用云端
               </button>
               <button
-                className="btn btn-primary"
+                className="px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
                 onClick={() => {
                   setShowConflictPrompt(false);
                   conflictResolverRef.current?.("local");

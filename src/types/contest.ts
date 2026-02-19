@@ -140,6 +140,7 @@ export interface GitHubConfig {
   platform: "github";
   token: string;
   repo: string;
+  directory?: string;
 }
 
 export interface R2Config {

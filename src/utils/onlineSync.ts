@@ -34,8 +34,12 @@ const bytesFromBase64 = (base64: string): Uint8Array => {
  */
 
 // 获取存储路径
-const getStoragePath = (contestTitle: string) => {
-  return `xcpc-statement-generator/${contestTitle}`;
+const getStoragePath = (contestTitle: string, directory?: string) => {
+  if (!directory) {
+    return contestTitle;
+  }
+  const base = directory.replace(/^\/|\/$/g, "");
+  return `${base}/${contestTitle}`;
 };
 
 // 通用存储操作接口
@@ -43,6 +47,7 @@ interface StorageAdapter {
   putFile(path: string, content: string | Uint8Array | Blob): Promise<void>;
   getFile(path: string): Promise<Uint8Array>;
   headFile(path: string): Promise<boolean>;
+  commit?(message: string): Promise<void>;
 }
 
 // 创建COS适配器
@@ -115,7 +120,10 @@ const createGitHubAdapter = (config: OnlineSyncConfig): StorageAdapter => {
   if (config.platform !== "github") throw new Error("Invalid config for GitHub");
   const octokit = new Octokit({ auth: config.token });
   const [owner, repo] = config.repo.split("/");
-  
+
+  // 待提交的缓存
+  const pendingFiles = new Map<string, { content: string; isBlob: boolean }>();
+
   const getFileSha = async (path: string) => {
     try {
       const res = await octokit.repos.getContent({ owner, repo, path });
@@ -126,19 +134,63 @@ const createGitHubAdapter = (config: OnlineSyncConfig): StorageAdapter => {
     }
   };
 
+  // 提交所有缓存的文件（单次 commit）
+  const commitAll = async (message: string) => {
+    if (pendingFiles.size === 0) return;
+
+    const entries = Array.from(pendingFiles.entries());
+    // 先创建所有 blobs
+    const blobResults = await Promise.all(
+      entries.map(async ([path, value]) => {
+        const res = await octokit.git.createBlob({ owner, repo, content: value.content, encoding: "base64" });
+        return { path, sha: res.data.sha };
+      })
+    );
+
+    // 构建 tree
+    const treeItems = blobResults.map((r) => ({
+      path: r.path,
+      mode: "100644" as const,
+      type: "blob" as const,
+      sha: r.sha,
+    }));
+
+    // 获取当前 commit 的 sha
+    const { data: ref } = await octokit.git.getRef({ owner, repo, ref: "heads/main" });
+    const currentCommitSha = ref.object.sha;
+
+    // 创建新 tree
+    const { data: newTree } = await octokit.git.createTree({
+      owner, repo,
+      tree: treeItems,
+      base_tree: currentCommitSha,
+    });
+
+    // 创建 commit
+    const { data: newCommit } = await octokit.git.createCommit({
+      owner, repo,
+      message,
+      tree: newTree.sha,
+      parents: [currentCommitSha],
+      committer: { name: "xcpc-statement-generator", email: "xcpc@generator.local" },
+    });
+
+    // 更新 main 分支引用
+    await octokit.git.updateRef({
+      owner, repo,
+      ref: "heads/main",
+      sha: newCommit.sha,
+    });
+
+    pendingFiles.clear();
+  };
+
   return {
     async putFile(path, content) {
       const base64Content = typeof content === 'string' ? base64FromString(content)
         : content instanceof Blob ? base64FromBytes(new Uint8Array(await content.arrayBuffer()))
         : base64FromBytes(content);
-      
-      await octokit.repos.createOrUpdateFileContents({
-        owner, repo, path,
-        message: `Update ${path}`,
-        content: base64Content,
-        sha: await getFileSha(path),
-        committer: { name: "xcpc-statement-generator", email: "xcpc@generator.local" },
-      });
+      pendingFiles.set(path, { content: base64Content, isBlob: false });
     },
     async getFile(path) {
       const response = await octokit.repos.getContent({ owner, repo, path });
@@ -151,6 +203,9 @@ const createGitHubAdapter = (config: OnlineSyncConfig): StorageAdapter => {
       } catch (err: any) {
         return err?.status !== 404 ? ((): never => { throw err; })() : false;
       }
+    },
+    async commit(message = "Update files") {
+      await commitAll(message);
     },
   };
 };
@@ -212,7 +267,8 @@ export const checkOnlineExists = async (
   config: OnlineSyncConfig,
   contestTitle: string
 ): Promise<boolean> => {
-  const basePath = getStoragePath(contestTitle);
+  const directory = (config as any).directory;
+  const basePath = getStoragePath(contestTitle, directory);
   const adapter = createStorageAdapter(config);
   try {
     return await adapter.headFile(`${basePath}/contest.json`);
@@ -236,7 +292,8 @@ const uploadWithAdapter = async (
   }
 ): Promise<void> => {
   const adapter = createStorageAdapter(config);
-  const basePath = getStoragePath(contestTitle);
+  const directory = (config as any).directory;
+  const basePath = getStoragePath(contestTitle, directory);
 
   try {
     // 上传配置文件
@@ -257,6 +314,11 @@ const uploadWithAdapter = async (
       const versionJson = JSON.stringify(versionData, null, 2);
       await adapter.putFile(`${basePath}/versions.json`, versionJson);
     }
+
+    // GitHub 适配器：一次性提交所有变更
+    if (config.platform === "github" && adapter.commit) {
+      await adapter.commit(`Sync contest: ${contestTitle}`);
+    }
   } catch (error) {
     console.error(`Failed to upload to ${config.platform}:`, error);
     throw error;
@@ -276,7 +338,8 @@ const downloadWithAdapter = async (
   branches?: any[];
 } | null> => {
   const adapter = createStorageAdapter(config);
-  const basePath = getStoragePath(contestTitle);
+  const directory = (config as any).directory;
+  const basePath = getStoragePath(contestTitle, directory);
 
   try {
     // 下载配置文件

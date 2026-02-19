@@ -201,7 +201,7 @@ export const exportConfig = async (data: ContestWithImages): Promise<string> => 
 
   const exportData: ExportedConfig = {
     meta: data.meta,
-    problems: data.problems,
+    problems: data.problems.map(({ key, ...rest }) => rest),
     images: imageData,
     template: data.template,
   };
@@ -229,7 +229,10 @@ export const importConfig = (json: string): {
   // Return data structure without url field
   const data: Contest = {
     meta: importData.meta,
-    problems: importData.problems,
+    problems: importData.problems.map((p: any) => ({
+      ...p,
+      key: p.key || crypto.randomUUID(),
+    })),
     images: imageData.map((img: { uuid: string; name: string }) => ({
       uuid: img.uuid,
       name: img.name,
