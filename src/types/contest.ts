@@ -116,3 +116,45 @@ export interface ExportedVersions {
     images: ExportedImageData[];
   })[];
 }
+
+// 在线同步配置类型
+export type SyncPlatform = "cos" | "oss" | "github" | "r2";
+
+export interface COSConfig {
+  platform: "cos";
+  secretId: string;
+  secretKey: string;
+  bucket: string;
+  region: string;
+}
+
+export interface OSSConfig {
+  platform: "oss";
+  accessKeyId: string;
+  accessKeySecret: string;
+  bucket: string;
+  region: string;
+}
+
+export interface GitHubConfig {
+  platform: "github";
+  token: string;
+  repo: string;
+}
+
+export interface R2Config {
+  platform: "r2";
+  accessKeyId: string;
+  secretAccessKey: string;
+  bucket: string;
+  accountId: string;
+}
+
+export type OnlineSyncConfig = COSConfig | OSSConfig | GitHubConfig | R2Config;
+
+export interface OnlineSyncSettings {
+  enabled: boolean;
+  autoSync: boolean;
+  config: OnlineSyncConfig | null;
+  lastSyncTime?: number;
+}

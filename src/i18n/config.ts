@@ -5,20 +5,24 @@ import { initReactI18next } from 'react-i18next';
 import enCommon from './locales/en/common.json';
 import enEditor from './locales/en/editor.json';
 import enMessages from './locales/en/messages.json';
+import enOnline from './locales/en/online.json';
 import zhCommon from './locales/zh/common.json';
 import zhEditor from './locales/zh/editor.json';
 import zhMessages from './locales/zh/messages.json';
+import zhOnline from './locales/zh/online.json';
 
 const resources = {
   en: {
     common: enCommon,
     editor: enEditor,
     messages: enMessages,
+    online: enOnline,
   },
   zh: {
     common: zhCommon,
     editor: zhEditor,
     messages: zhMessages,
+    online: zhOnline,
   },
 };
 
@@ -29,7 +33,7 @@ i18n
     lng: localStorage.getItem('language') || 'zh', // default language
     fallbackLng: 'zh',
     defaultNS: 'common',
-    ns: ['common', 'editor', 'messages'],
+    ns: ['common', 'editor', 'messages', 'online'],
     interpolation: {
       escapeValue: false, // React already escapes values
     },

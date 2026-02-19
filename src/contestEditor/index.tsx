@@ -9,15 +9,18 @@ import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFileCode, faLanguage, faUpload, faFileZipper, faX, faImages, faChevronDown, faArrowsDownToLine, faHistory } from "@fortawesome/free-solid-svg-icons";
+import { faFileCode, faLanguage, faUpload, faFileZipper, faX, faImages, faChevronDown, faArrowsDownToLine, faHistory, faCloud } from "@fortawesome/free-solid-svg-icons";
 
 import type { ContestWithImages, ImageData } from "@/types/contest";
 import { exampleStatements } from "./exampleStatements";
 import { compileToPdf, compileProblemToPdf, typstInitPromise, registerImages } from "@/compiler";
 import { saveConfigToDB, loadConfigFromDB, exportConfig, importConfig, clearDB, saveImageToDB } from "@/utils/indexedDBUtils";
 import { loadPolygonPackage } from "@/utils/polygonConverter";
+import { uploadToOnline } from "@/utils/onlineSync";
+import { getAllVersions, getAllBranches } from "@/utils/versionControl";
 import { useToast } from "@/components/ToastProvider";
 import VersionManager from "@/components/VersionManager";
+import OnlineManager from "@/components/OnlineManager";
 import { type PreviewHandle } from "./Preview";
 
 import Sidebar from "./Sidebar";
@@ -64,6 +67,7 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
   const [showVersionManager, setShowVersionManager] = useState(false);
   const [showTemplateEditor, setShowTemplateEditor] = useState(false);
   const [showReorder, setShowReorder] = useState(false);
+  const [showOnlineManager, setShowOnlineManager] = useState(false);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const [confirmModalContent, setConfirmModalContent] = useState({ title: '', content: '' });
   const [previewFullscreen, setPreviewFullscreen] = useState(false);
@@ -72,6 +76,10 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
     const saved = localStorage.getItem("vimMode");
     return saved ? saved === "true" : false;
   });
+  const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'pending' | 'disabled'>('disabled');
+  const [lastSyncTime, setLastSyncTime] = useState<number>();
+  const lastSyncDataRef = useRef<string>('');
+  const autoSyncInFlightRef = useRef(false);
   const previewRef = useRef<PreviewHandle>(null);
 
   // Responsive layout
@@ -94,14 +102,192 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
     []
   );
 
-  useEffect(() => { debouncedSave(contestData); }, [contestData, debouncedSave]);
+  // Memoize serialized contest data for change detection
+  const contestDataStr = useMemo(() => JSON.stringify({
+    meta: contestData.meta,
+    problems: contestData.problems,
+  }), [contestData.meta, contestData.problems]);
 
-  // Register images with compiler when images change
+  useEffect(() => { debouncedSave(contestData); }, [contestData, debouncedSave]);
   useEffect(() => {
     registerImages(contestData.images).catch((e) =>
       console.error("Failed to register images:", e)
     );
   }, [contestData.images]);
+
+  const refreshSyncSettings = useCallback(() => {
+    const savedSettings = localStorage.getItem("onlineSyncSettings");
+    if (savedSettings) {
+      const parsed = JSON.parse(savedSettings);
+      if (parsed.enabled && parsed.config) {
+        setLastSyncTime(parsed.lastSyncTime);
+        if (parsed.lastSyncTime && lastSyncDataRef.current) {
+          setSyncStatus('synced');
+        } else {
+          setSyncStatus('pending');
+        }
+        return;
+      }
+    }
+    setSyncStatus('disabled');
+  }, []);
+
+  // Load sync settings on mount and when OnlineManager closes
+  useEffect(() => {
+    refreshSyncSettings();
+  }, [refreshSyncSettings]);
+
+  useEffect(() => {
+    if (!showOnlineManager) {
+      refreshSyncSettings();
+    }
+  }, [showOnlineManager, refreshSyncSettings]);
+
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "onlineSyncSettings") {
+        refreshSyncSettings();
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [refreshSyncSettings]);
+
+  // Track changes to contest data and update sync status
+  useEffect(() => {
+    if (lastSyncDataRef.current && contestDataStr !== lastSyncDataRef.current) {
+      if (syncStatus === 'synced') {
+        setSyncStatus('pending');
+      }
+    }
+  }, [contestDataStr, syncStatus]);
+
+  const autoSync = useMemo(() =>
+    debounce(async (data: ContestWithImages, dataStr?: string) => {
+      if (!dataStr || dataStr === lastSyncDataRef.current) return;
+      const savedSettings = localStorage.getItem("onlineSyncSettings");
+      if (!savedSettings) return;
+      const parsed = JSON.parse(savedSettings);
+      if (!parsed.enabled || !parsed.config || !parsed.autoSync) return;
+      if (autoSyncInFlightRef.current) return;
+
+      autoSyncInFlightRef.current = true;
+      setSyncStatus('syncing');
+      try {
+        const versions = await getAllVersions();
+        const branches = await getAllBranches();
+
+        const images = new Map<string, Blob>();
+        for (const img of data.images) {
+          const response = await fetch(img.url);
+          const blob = await response.blob();
+          images.set(img.uuid, blob);
+        }
+
+        await uploadToOnline(parsed.config, data.meta.title, {
+          contest: {
+            meta: data.meta,
+            problems: data.problems,
+            images: data.images.map((img) => ({ uuid: img.uuid, name: img.name })),
+            template: data.template,
+          },
+          images,
+          versions,
+          branches,
+        });
+
+        const syncedAt = Date.now();
+        const newSettings = {
+          ...parsed,
+          lastSyncTime: syncedAt,
+        };
+        localStorage.setItem("onlineSyncSettings", JSON.stringify(newSettings));
+        setLastSyncTime(syncedAt);
+        setSyncStatus('synced');
+        lastSyncDataRef.current = dataStr;
+      } catch (e) {
+        console.error("Auto-sync failed:", e);
+        setSyncStatus('pending');
+      } finally {
+        autoSyncInFlightRef.current = false;
+      }
+    }, 800),
+    []
+  );
+
+  useEffect(() => {
+    autoSync(contestData, contestDataStr);
+  }, [contestData, contestDataStr, autoSync]);
+
+  const handleManualSync = useCallback(async () => {
+    const savedSettings = localStorage.getItem("onlineSyncSettings");
+    if (!savedSettings) {
+      showToast(t("online:error.no_config"), "error");
+      setShowOnlineManager(true);
+      return;
+    }
+    const parsed = JSON.parse(savedSettings);
+    if (!parsed.enabled || !parsed.config) {
+      showToast(t("online:error.no_config"), "error");
+      setShowOnlineManager(true);
+      return;
+    }
+    if (autoSyncInFlightRef.current) return;
+
+    autoSyncInFlightRef.current = true;
+    setSyncStatus('syncing');
+    try {
+      const versions = await getAllVersions();
+      const branches = await getAllBranches();
+
+      const images = new Map<string, Blob>();
+      for (const img of contestData.images) {
+        const response = await fetch(img.url);
+        const blob = await response.blob();
+        images.set(img.uuid, blob);
+      }
+
+      await uploadToOnline(parsed.config, contestData.meta.title, {
+        contest: {
+          meta: contestData.meta,
+          problems: contestData.problems,
+          images: contestData.images.map((img) => ({ uuid: img.uuid, name: img.name })),
+          template: contestData.template,
+        },
+        images,
+        versions,
+        branches,
+      });
+
+      const syncedAt = Date.now();
+      const newSettings = {
+        ...parsed,
+        lastSyncTime: syncedAt,
+      };
+      localStorage.setItem("onlineSyncSettings", JSON.stringify(newSettings));
+      setLastSyncTime(syncedAt);
+      setSyncStatus('synced');
+      lastSyncDataRef.current = contestDataStr;
+      showToast(t("online:upload_success"), "success");
+    } catch (e) {
+      console.error("Manual sync failed:", e);
+      setSyncStatus('pending');
+      showToast(t("online:upload_failed"), "error");
+    } finally {
+      autoSyncInFlightRef.current = false;
+    }
+  }, [contestData, contestDataStr, showToast, t]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const isSave = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s";
+      if (!isSave) return;
+      e.preventDefault();
+      handleManualSync();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [handleManualSync]);
 
   // Enable export after Typst init
   useEffect(() => {
@@ -412,6 +598,9 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
                       });
                   }}
                   vimMode={vimMode}
+                  syncStatus={syncStatus}
+                  lastSyncTime={lastSyncTime}
+                  onSyncStatusClick={handleManualSync}
                 />
               </Allotment.Pane>
 
@@ -531,10 +720,40 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
                     <FontAwesomeIcon icon={faHistory} className="text-xl w-6" />
                     <span className="text-base">{t('messages:versionControl.title')}</span>
                   </button>
+                  <div className="divider my-1">云同步</div>
+
+                  {/* Online Sync */}
+                  <button className="btn btn-outline btn-lg justify-start gap-4 h-14" onClick={() => { setShowSettings(false); setShowOnlineManager(true); }}>
+                    <FontAwesomeIcon icon={faCloud} className="text-xl w-6" />
+                    <span className="text-base">{t('online:title')}</span>
+                  </button>
                 </div>
               </div>
               <div className="modal-backdrop" onClick={() => setShowSettings(false)}></div>
             </div>
+          )}
+
+          {/* Online Manager Modal */}
+          {showOnlineManager && (
+            <OnlineManager
+              isOpen={showOnlineManager}
+              onClose={() => setShowOnlineManager(false)}
+              contestData={contestData}
+              onDataImported={(data) => {
+                updateContestData(() => data);
+                setSyncStatus('synced');
+                setLastSyncTime(Date.now());
+                lastSyncDataRef.current = JSON.stringify({
+                  meta: data.meta,
+                  problems: data.problems,
+                });
+              }}
+              onSyncComplete={(syncedAt) => {
+                setSyncStatus('synced');
+                setLastSyncTime(syncedAt);
+                lastSyncDataRef.current = contestDataStr;
+              }}
+            />
           )}
 
           {/* Template Editor Modal */}
@@ -639,6 +858,9 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
                 onDeleteProblem={handleDeleteProblem}
                 onExportCurrentProblem={undefined}
                 vimMode={vimMode}
+                syncStatus={syncStatus}
+                lastSyncTime={lastSyncTime}
+                onSyncStatusClick={handleManualSync}
               />
             ) : (
               <PreviewArea
@@ -754,10 +976,40 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
                     <FontAwesomeIcon icon={faHistory} className="text-xl w-6" />
                     <span className="text-base">{t('messages:versionControl.title')}</span>
                   </button>
+                  <div className="divider my-1">云同步</div>
+
+                  {/* Online Sync */}
+                  <button className="btn btn-outline btn-lg justify-start gap-4 h-14" onClick={() => { setShowSettings(false); setShowOnlineManager(true); }}>
+                    <FontAwesomeIcon icon={faCloud} className="text-xl w-6" />
+                    <span className="text-base">{t('online:title')}</span>
+                  </button>
                 </div>
               </div>
               <div className="modal-backdrop" onClick={() => setShowSettings(false)}></div>
             </div>
+          )}
+
+          {/* Online Manager Modal */}
+          {showOnlineManager && (
+            <OnlineManager
+              isOpen={showOnlineManager}
+              onClose={() => setShowOnlineManager(false)}
+              contestData={contestData}
+              onDataImported={(data) => {
+                updateContestData(() => data);
+                setSyncStatus('synced');
+                setLastSyncTime(Date.now());
+                lastSyncDataRef.current = JSON.stringify({
+                  meta: data.meta,
+                  problems: data.problems,
+                });
+              }}
+              onSyncComplete={(syncedAt) => {
+                setSyncStatus('synced');
+                setLastSyncTime(syncedAt);
+                lastSyncDataRef.current = contestDataStr;
+              }}
+            />
           )}
 
           {/* Template Editor Modal */}
