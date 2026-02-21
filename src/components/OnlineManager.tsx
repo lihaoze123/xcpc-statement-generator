@@ -477,6 +477,19 @@ const OnlineManager: FC<OnlineManagerProps> = ({
     localStorage.setItem("onlineSyncSettings", JSON.stringify(newSettings));
   };
 
+  // 禁用云同步
+  const disableSync = () => {
+    const newSettings: OnlineSyncSettings = {
+      enabled: false,
+      autoSync: false,
+      config: null,
+      lastSyncTime: undefined,
+    };
+    setSettings(newSettings);
+    localStorage.setItem("onlineSyncSettings", JSON.stringify(newSettings));
+    showToast("云同步已关闭", "success");
+  };
+
   if (!isOpen) return null;
 
   const platformName = (p: string) => {
@@ -528,13 +541,21 @@ const OnlineManager: FC<OnlineManagerProps> = ({
                 {settings.enabled ? t("online:edit_config") : t("online:configure")}
               </button>
               {settings.enabled && settings.config && (
-                <button
-                  onClick={handleTestConnection}
-                  disabled={isTesting}
-                  className="w-full py-2 px-4 border rounded hover:bg-gray-50 disabled:opacity-50"
-                >
-                  {isTesting ? t("online:testing") : t("online:test_connection")}
-                </button>
+                <>
+                  <button
+                    onClick={handleTestConnection}
+                    disabled={isTesting}
+                    className="w-full py-2 px-4 border rounded hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    {isTesting ? t("online:testing") : t("online:test_connection")}
+                  </button>
+                  <button
+                    onClick={disableSync}
+                    className="w-full py-2 px-4 border border-red-300 text-red-600 rounded hover:bg-red-50"
+                  >
+                    禁用云同步
+                  </button>
+                </>
               )}
             </div>
           ) : (
