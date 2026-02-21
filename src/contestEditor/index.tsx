@@ -215,7 +215,18 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
     []
   );
 
+  // 使用 ref 跟踪是否是首次加载
+  const isInitialLoadRef = useRef(true);
+
   useEffect(() => {
+    // 首次加载时不自动同步，只记录当前状态
+    if (isInitialLoadRef.current) {
+      isInitialLoadRef.current = false;
+      lastSyncDataRef.current = contestDataStr;
+      return;
+    }
+    
+    // 后续变化才触发自动同步
     autoSync(contestData, contestDataStr);
   }, [contestData, contestDataStr, autoSync]);
 
