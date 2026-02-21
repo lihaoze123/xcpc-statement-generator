@@ -55,12 +55,14 @@ const OnlineManager: FC<OnlineManagerProps> = ({
   const [cosSecretKey, setCosSecretKey] = useState("");
   const [cosBucket, setCosBucket] = useState("");
   const [cosRegion, setCosRegion] = useState("");
+  const [cosDirectory, setCosDirectory] = useState("");
 
   // OSS 配置
   const [ossAccessKeyId, setOssAccessKeyId] = useState("");
   const [ossAccessKeySecret, setOssAccessKeySecret] = useState("");
   const [ossBucket, setOssBucket] = useState("");
   const [ossRegion, setOssRegion] = useState("");
+  const [ossDirectory, setOssDirectory] = useState("");
 
   // GitHub 配置
   const [githubToken, setGithubToken] = useState("");
@@ -72,6 +74,7 @@ const OnlineManager: FC<OnlineManagerProps> = ({
   const [r2SecretAccessKey, setR2SecretAccessKey] = useState("");
   const [r2Bucket, setR2Bucket] = useState("");
   const [r2AccountId, setR2AccountId] = useState("");
+  const [r2Directory, setR2Directory] = useState("");
 
   const readConfigCache = () => {
     try {
@@ -88,13 +91,13 @@ const OnlineManager: FC<OnlineManagerProps> = ({
   const snapshotCurrentPlatform = () => {
     switch (platform) {
       case "cos":
-        return { secretId: cosSecretId, secretKey: cosSecretKey, bucket: cosBucket, region: cosRegion };
+        return { secretId: cosSecretId, secretKey: cosSecretKey, bucket: cosBucket, region: cosRegion, directory: cosDirectory || undefined };
       case "oss":
-        return { accessKeyId: ossAccessKeyId, accessKeySecret: ossAccessKeySecret, bucket: ossBucket, region: ossRegion };
+        return { accessKeyId: ossAccessKeyId, accessKeySecret: ossAccessKeySecret, bucket: ossBucket, region: ossRegion, directory: ossDirectory || undefined };
       case "github":
-        return { token: githubToken, repo: githubRepo, directory: githubDirectory };
+        return { token: githubToken, repo: githubRepo, directory: githubDirectory || undefined };
       case "r2":
-        return { accessKeyId: r2AccessKeyId, secretAccessKey: r2SecretAccessKey, bucket: r2Bucket, accountId: r2AccountId };
+        return { accessKeyId: r2AccessKeyId, secretAccessKey: r2SecretAccessKey, bucket: r2Bucket, accountId: r2AccountId, directory: r2Directory || undefined };
     }
   };
 
@@ -104,11 +107,13 @@ const OnlineManager: FC<OnlineManagerProps> = ({
       setCosSecretKey(draft?.secretKey || "");
       setCosBucket(draft?.bucket || "");
       setCosRegion(draft?.region || "");
+      setCosDirectory(draft?.directory || "");
     } else if (nextPlatform === "oss") {
       setOssAccessKeyId(draft?.accessKeyId || "");
       setOssAccessKeySecret(draft?.accessKeySecret || "");
       setOssBucket(draft?.bucket || "");
       setOssRegion(draft?.region || "");
+      setOssDirectory(draft?.directory || "");
     } else if (nextPlatform === "github") {
       setGithubToken(draft?.token || "");
       setGithubRepo(draft?.repo || "");
@@ -118,6 +123,7 @@ const OnlineManager: FC<OnlineManagerProps> = ({
       setR2SecretAccessKey(draft?.secretAccessKey || "");
       setR2Bucket(draft?.bucket || "");
       setR2AccountId(draft?.accountId || "");
+      setR2Directory(draft?.directory || "");
     }
   };
 
@@ -161,12 +167,14 @@ const OnlineManager: FC<OnlineManagerProps> = ({
           setCosSecretKey(cfg.secretKey || "");
           setCosBucket(cfg.bucket || "");
           setCosRegion(cfg.region || "");
+          setCosDirectory(cfg.directory || "");
         } else if (cfg.platform === "oss") {
           setPlatform("oss");
           setOssAccessKeyId(cfg.accessKeyId || "");
           setOssAccessKeySecret(cfg.accessKeySecret || "");
           setOssBucket(cfg.bucket || "");
           setOssRegion(cfg.region || "");
+          setOssDirectory(cfg.directory || "");
         } else if (cfg.platform === "github") {
           setPlatform("github");
           setGithubToken(cfg.token || "");
@@ -178,13 +186,14 @@ const OnlineManager: FC<OnlineManagerProps> = ({
           setR2SecretAccessKey(cfg.secretAccessKey || "");
           setR2Bucket(cfg.bucket || "");
           setR2AccountId(cfg.accountId || "");
+          setR2Directory(cfg.directory || "");
         }
       }
     }
   }, []);
 
   // 保存配置
-  const saveSettings = () => {
+  const saveSettings = async () => {
     let config: OnlineSyncConfig | null = null;
 
     if (platform === "cos") {
@@ -198,6 +207,7 @@ const OnlineManager: FC<OnlineManagerProps> = ({
         secretKey: cosSecretKey,
         bucket: cosBucket,
         region: cosRegion,
+        directory: cosDirectory || undefined,
       };
     } else if (platform === "oss") {
       if (!ossAccessKeyId || !ossAccessKeySecret || !ossBucket || !ossRegion) {
@@ -210,6 +220,7 @@ const OnlineManager: FC<OnlineManagerProps> = ({
         accessKeySecret: ossAccessKeySecret,
         bucket: ossBucket,
         region: ossRegion,
+        directory: ossDirectory || undefined,
       };
     } else if (platform === "github") {
       if (!githubToken || !githubRepo) {
@@ -233,26 +244,45 @@ const OnlineManager: FC<OnlineManagerProps> = ({
         secretAccessKey: r2SecretAccessKey,
         bucket: r2Bucket,
         accountId: r2AccountId,
+        directory: r2Directory || undefined,
       };
     } else {
       showToast(t("online:error.not_implemented"), "error");
       return;
     }
 
-    const newSettings: OnlineSyncSettings = {
-      ...settings,
-      config,
-      enabled: true,
-    };
+    // 测试配置是否可用
+    setIsTesting(true);
+    try {
+      const result = await testConnection(config);
+      
+      if (!result.success) {
+        showToast(result.message, "error");
+        setIsTesting(false);
+        return;
+      }
 
-    const cache = readConfigCache();
-    cache[platform] = config;
-    writeConfigCache(cache);
+      // 配置测试成功，保存
+      const newSettings: OnlineSyncSettings = {
+        ...settings,
+        config,
+        enabled: true,
+      };
 
-    setSettings(newSettings);
-    localStorage.setItem("onlineSyncSettings", JSON.stringify(newSettings));
-    setShowConfig(false);
-    showToast(t("online:config_saved"), "success");
+      const cache = readConfigCache();
+      cache[platform] = config;
+      writeConfigCache(cache);
+
+      setSettings(newSettings);
+      localStorage.setItem("onlineSyncSettings", JSON.stringify(newSettings));
+      setShowConfig(false);
+      showToast(t("online:config_saved"), "success");
+    } catch (error: any) {
+      console.error("Save settings error:", error);
+      showToast(`Error: ${error?.message || "Unknown error"}`, "error");
+    } finally {
+      setIsTesting(false);
+    }
   };
 
   // 测试连接
@@ -264,15 +294,16 @@ const OnlineManager: FC<OnlineManagerProps> = ({
 
     setIsTesting(true);
     try {
-      const success = await testConnection(settings.config);
-      if (success) {
-        showToast(t("online:test_success"), "success");
+      const result = await testConnection(settings.config);
+      
+      if (result.success) {
+        showToast(result.message, "success");
       } else {
-        showToast(t("online:test_failed"), "error");
+        showToast(result.message, "error");
       }
     } catch (error: any) {
       console.error("Test connection error:", error);
-      showToast(t("online:test_failed"), "error");
+      showToast(`Error: ${error?.message || "Unknown error"}`, "error");
     } finally {
       setIsTesting(false);
     }
@@ -475,6 +506,7 @@ const OnlineManager: FC<OnlineManagerProps> = ({
           <div className="text-sm">
             {settings.enabled && settings.config ? (
               <div className="text-green-600 flex items-center gap-2">
+                <span className="text-gray-600">上次同步信息：</span>
                 <span>{platformName(settings.config.platform)}</span>
                 {settings.lastSyncTime && (
                   <span className="text-gray-400">· {new Date(settings.lastSyncTime).toLocaleDateString()}</span>
@@ -532,6 +564,7 @@ const OnlineManager: FC<OnlineManagerProps> = ({
                   <input type="password" placeholder="Secret Key" value={cosSecretKey} onChange={(e) => setCosSecretKey(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
                   <input type="text" placeholder="Bucket" value={cosBucket} onChange={(e) => setCosBucket(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
                   <input type="text" placeholder="Region (如 ap-guangzhou)" value={cosRegion} onChange={(e) => setCosRegion(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
+                  <input type="text" placeholder="Directory (可选, 如 contests, 不填默认根目录)" value={cosDirectory} onChange={(e) => setCosDirectory(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
                 </div>
               )}
 
@@ -542,6 +575,7 @@ const OnlineManager: FC<OnlineManagerProps> = ({
                   <input type="password" placeholder="Access Key Secret" value={ossAccessKeySecret} onChange={(e) => setOssAccessKeySecret(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
                   <input type="text" placeholder="Bucket" value={ossBucket} onChange={(e) => setOssBucket(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
                   <input type="text" placeholder="Region (如 oss-cn-hangzhou)" value={ossRegion} onChange={(e) => setOssRegion(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
+                  <input type="text" placeholder="Directory (可选, 如 contests, 不填默认根目录)" value={ossDirectory} onChange={(e) => setOssDirectory(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
                 </div>
               )}
 
@@ -550,7 +584,7 @@ const OnlineManager: FC<OnlineManagerProps> = ({
                 <div className="space-y-2">
                   <input type="password" placeholder="Personal Access Token" value={githubToken} onChange={(e) => setGithubToken(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
                   <input type="text" placeholder="Repository (owner/repo)" value={githubRepo} onChange={(e) => setGithubRepo(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
-                  <input type="text" placeholder="Directory (可选, 如 my-contests)" value={githubDirectory} onChange={(e) => setGithubDirectory(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
+                  <input type="text" placeholder="Directory (可选, 如 contests, 不填默认根目录)" value={githubDirectory} onChange={(e) => setGithubDirectory(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
                 </div>
               )}
 
@@ -561,14 +595,15 @@ const OnlineManager: FC<OnlineManagerProps> = ({
                   <input type="password" placeholder="Secret Access Key" value={r2SecretAccessKey} onChange={(e) => setR2SecretAccessKey(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
                   <input type="text" placeholder="Bucket" value={r2Bucket} onChange={(e) => setR2Bucket(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
                   <input type="text" placeholder="Account ID" value={r2AccountId} onChange={(e) => setR2AccountId(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
+                  <input type="text" placeholder="Directory (可选, 如 contests, 不填默认根目录)" value={r2Directory} onChange={(e) => setR2Directory(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
                 </div>
               )}
 
               <div className="flex gap-2">
-                <button onClick={saveSettings} className="flex-1 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
-                  {t("online:save_config")}
+                <button onClick={() => saveSettings()} disabled={isTesting} className="flex-1 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 text-sm">
+                  {isTesting ? `${t("online:testing")}...` : t("online:save_config")}
                 </button>
-                <button onClick={() => setShowConfig(false)} className="flex-1 py-2 border rounded hover:bg-gray-50 text-sm">
+                <button onClick={() => setShowConfig(false)} disabled={isTesting} className="flex-1 py-2 border rounded hover:bg-gray-50 disabled:bg-gray-100 text-sm">
                   {t("common:cancel")}
                 </button>
               </div>
@@ -576,7 +611,7 @@ const OnlineManager: FC<OnlineManagerProps> = ({
           )}
 
           {/* 自动同步 */}
-          {settings.enabled && settings.config && (
+          {!showConfig && settings.enabled && settings.config && (
             <div className="flex items-center justify-between py-2 border-t">
               <span className="text-sm">{t("online:auto_sync")}</span>
               <input type="checkbox" checked={settings.autoSync} onChange={toggleAutoSync} className="toggle toggle-sm" />
@@ -584,7 +619,7 @@ const OnlineManager: FC<OnlineManagerProps> = ({
           )}
 
           {/* 同步操作按钮 */}
-          {settings.enabled && settings.config && (
+          {!showConfig && settings.enabled && settings.config && (
             <div className="flex gap-2 pt-2 border-t">
               <button
                 onClick={handleUpload}

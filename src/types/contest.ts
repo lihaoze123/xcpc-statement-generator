@@ -126,6 +126,7 @@ export interface COSConfig {
   secretKey: string;
   bucket: string;
   region: string;
+  directory?: string; // 可选的目录前缀
 }
 
 export interface OSSConfig {
@@ -134,6 +135,7 @@ export interface OSSConfig {
   accessKeySecret: string;
   bucket: string;
   region: string;
+  directory?: string; // 可选的目录前缀
 }
 
 export interface GitHubConfig {
@@ -149,6 +151,7 @@ export interface R2Config {
   secretAccessKey: string;
   bucket: string;
   accountId: string;
+  directory?: string;
 }
 
 export type OnlineSyncConfig = COSConfig | OSSConfig | GitHubConfig | R2Config;
