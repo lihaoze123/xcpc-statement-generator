@@ -16,11 +16,12 @@ import { exampleStatements } from "./exampleStatements";
 import { compileToPdf, compileProblemToPdf, typstInitPromise, registerImages } from "@/compiler";
 import { saveConfigToDB, loadConfigFromDB, exportConfig, importConfig, clearDB, saveImageToDB } from "@/utils/indexedDBUtils";
 import { loadPolygonPackage } from "@/utils/polygonConverter";
-import { uploadToOnline } from "@/utils/onlineSync";
+import { uploadToOnline, downloadFromOnline } from "@/utils/onlineSync";
 import { getAllVersions, getAllBranches } from "@/utils/versionControl";
 import { useToast } from "@/components/ToastProvider";
 import VersionManager from "@/components/VersionManager";
 import OnlineManager from "@/components/OnlineManager";
+import ProblemMergeDialog from "@/components/ProblemMergeDialog";
 import { type PreviewHandle } from "./Preview";
 
 import Sidebar from "./Sidebar";
@@ -76,11 +77,72 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
     const saved = localStorage.getItem("vimMode");
     return saved ? saved === "true" : false;
   });
-  const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'pending' | 'disabled'>('disabled');
+  const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'pending' | 'disabled'>(() => {
+    try {
+      const savedSettings = localStorage.getItem("onlineSyncSettings");
+      if (savedSettings) {
+        const parsed = JSON.parse(savedSettings);
+        if (parsed.enabled && parsed.config) {
+          return 'pending';
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return 'disabled';
+  });
   const [lastSyncTime, setLastSyncTime] = useState<number>();
   const lastSyncDataRef = useRef<string>('');
   const autoSyncInFlightRef = useRef(false);
   const previewRef = useRef<PreviewHandle>(null);
+  const isInitialLoadRef = useRef(true);
+  const [showProblemMergePrompt, setShowProblemMergePrompt] = useState(false);
+  const [problemMergeConflicts, setProblemMergeConflicts] = useState<Array<{
+    index: number;
+    local?: ContestWithImages['problems'][0];
+    cloud?: ContestWithImages['problems'][0];
+  }>>([]);
+  const [selectedProblemChoices, setSelectedProblemChoices] = useState<Record<number, "local" | "cloud">>({});
+  const [rememberCurrentChoices, setRememberCurrentChoices] = useState<Record<number, boolean>>({});
+  const [rememberedMergeChoices, setRememberedMergeChoices] = useState<Record<number, "local" | "cloud">>({});
+  const problemMergeResolverRef = useRef<((result: { choices: Record<number, "local" | "cloud"> } | null) => void) | null>(null);
+
+  const getProblemDetail = (problem?: ContestWithImages['problems'][0]) => {
+    if (!problem) return null;
+    return {
+      title: problem.problem.display_name,
+      format: problem.problem.format || "latex",
+      samples: problem.problem.samples?.length ?? 0,
+      description: problem.statement.description || "",
+      input: problem.statement.input || "",
+      output: problem.statement.output || "",
+      notes: problem.statement.notes || "",
+    };
+  };
+
+  const requestProblemMerge = (
+    conflicts: Array<{
+      index: number;
+      local?: ContestWithImages['problems'][0];
+      cloud?: ContestWithImages['problems'][0];
+    }>,
+    defaultChoices: Record<number, "local" | "cloud">
+  ) =>
+    new Promise<{ choices: Record<number, "local" | "cloud"> } | null>((resolve) => {
+      setProblemMergeConflicts(conflicts);
+      const initialChoices: Record<number, "local" | "cloud"> = {};
+      for (const conflict of conflicts) {
+        if (defaultChoices[conflict.index] !== undefined) {
+          initialChoices[conflict.index] = defaultChoices[conflict.index];
+        } else if (rememberedMergeChoices[conflict.index] !== undefined) {
+          initialChoices[conflict.index] = rememberedMergeChoices[conflict.index];
+        }
+      }
+      setSelectedProblemChoices(initialChoices);
+      setRememberCurrentChoices({});
+      problemMergeResolverRef.current = resolve;
+      setShowProblemMergePrompt(true);
+    });
 
   // Responsive layout
   const isDesktop = useMediaQuery("(min-width: 768px)");
@@ -121,7 +183,9 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
       const parsed = JSON.parse(savedSettings);
       if (parsed.enabled && parsed.config) {
         setLastSyncTime(parsed.lastSyncTime);
-        if (parsed.lastSyncTime && lastSyncDataRef.current) {
+        if (isInitialLoadRef.current) {
+          setSyncStatus('pending');
+        } else if (parsed.lastSyncTime && lastSyncDataRef.current) {
           setSyncStatus('synced');
         } else {
           setSyncStatus('pending');
@@ -216,6 +280,13 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
   );
 
   useEffect(() => {
+    // 首次加载时不自动同步，只记录当前状态
+    if (isInitialLoadRef.current) {
+      isInitialLoadRef.current = false;
+      return;
+    }
+    
+    // 后续变化才触发自动同步
     autoSync(contestData, contestDataStr);
   }, [contestData, contestDataStr, autoSync]);
 
@@ -234,9 +305,80 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
     }
     if (autoSyncInFlightRef.current) return;
 
-    autoSyncInFlightRef.current = true;
-    setSyncStatus('syncing');
+    const stripProblemKey = (problem: ContestWithImages['problems'][0]) => {
+      const { key, ...rest } = problem;
+      return rest;
+    };
+
+    const areProblemsEqual = (
+      localProblem?: ContestWithImages['problems'][0],
+      cloudProblem?: ContestWithImages['problems'][0]
+    ) => {
+      if (!localProblem && !cloudProblem) return true;
+      if (!localProblem || !cloudProblem) return false;
+      return JSON.stringify(stripProblemKey(localProblem)) === JSON.stringify(cloudProblem);
+    };
+
     try {
+      const cloudData = await downloadFromOnline(parsed.config, contestData.meta.title);
+      const localProblems = contestData.problems;
+      const cloudProblems = cloudData?.contest?.problems || [];
+      const maxCount = Math.max(localProblems.length, cloudProblems.length);
+
+      let problemsForUpload = localProblems;
+      if (cloudProblems.length > 0) {
+        const conflicts: Array<{
+          index: number;
+          local?: ContestWithImages['problems'][0];
+          cloud?: ContestWithImages['problems'][0];
+        }> = [];
+        const defaultChoices: Record<number, "local" | "cloud"> = {};
+
+        for (let i = 0; i < maxCount; i += 1) {
+          const localProblem = localProblems[i];
+          const cloudProblem = cloudProblems[i];
+          if (!areProblemsEqual(localProblem, cloudProblem)) {
+            conflicts.push({ index: i, local: localProblem, cloud: cloudProblem });
+          }
+        }
+
+        if (conflicts.length > 0) {
+          // 显示所有冲突，已记住的会预填充选择
+          for (const c of conflicts) {
+            if (rememberedMergeChoices[c.index] !== undefined) {
+              defaultChoices[c.index] = rememberedMergeChoices[c.index];
+            }
+          }
+
+          let mergeChoices: Record<number, "local" | "cloud"> = { ...defaultChoices };
+
+          const mergeResult = await requestProblemMerge(conflicts, defaultChoices);
+          if (!mergeResult) {
+            return;
+          }
+          mergeChoices = { ...mergeChoices, ...mergeResult.choices };
+
+          const merged: ContestWithImages['problems'] = [];
+          for (let i = 0; i < maxCount; i += 1) {
+            const localProblem = localProblems[i];
+            const cloudProblem = cloudProblems[i];
+            const choice = mergeChoices[i];
+            if (choice === "cloud") {
+              if (cloudProblem) merged.push(cloudProblem as ContestWithImages['problems'][0]);
+            } else {
+              if (localProblem) merged.push(localProblem);
+            }
+          }
+          problemsForUpload = merged;
+          // 更新本地 contestData
+          updateContestData((draft) => {
+            draft.problems = problemsForUpload;
+          });
+        }
+      }
+
+      autoSyncInFlightRef.current = true;
+      setSyncStatus('syncing');
       const versions = await getAllVersions();
       const branches = await getAllBranches();
 
@@ -250,7 +392,7 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
       await uploadToOnline(parsed.config, contestData.meta.title, {
         contest: {
           meta: contestData.meta,
-          problems: contestData.problems,
+          problems: problemsForUpload.map(({ key, ...rest }) => rest),
           images: contestData.images.map((img) => ({ uuid: img.uuid, name: img.name })),
           template: contestData.template,
         },
@@ -276,7 +418,7 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
     } finally {
       autoSyncInFlightRef.current = false;
     }
-  }, [contestData, contestDataStr, showToast, t]);
+  }, [contestData, contestDataStr, rememberedMergeChoices, showToast, t]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -338,7 +480,7 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
       content: t('messages:deleteProblemConfirm.content'),
     });
 
-    setPendingAction(() => {
+    setPendingAction(() => () => {
       updateContestData((draft) => {
         const idx = draft.problems.findIndex((p) => p.key === key);
         if (idx !== -1) draft.problems.splice(idx, 1);
@@ -625,10 +767,10 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
                 <h3 className="font-bold text-lg">{confirmModalContent.title}</h3>
                 <p className="py-4">{confirmModalContent.content}</p>
                 <div className="modal-action">
-                  <button className="btn btn-ghost" onClick={() => { setShowConfirmModal(false); pendingAction?.(); }}>
+                  <button className="btn btn-ghost" onClick={() => { setShowConfirmModal(false); setPendingAction(null); }}>
                     {t('common:cancel')}
                   </button>
-                  <button className="btn btn-primary" onClick={() => { setShowConfirmModal(false); pendingAction?.(); }}>
+                  <button className="btn btn-primary" onClick={() => { setShowConfirmModal(false); pendingAction?.(); setPendingAction(null); }}>
                     {t('common:continue')}
                   </button>
                 </div>
@@ -636,6 +778,27 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
               <div className="modal-backdrop" onClick={() => setShowConfirmModal(false)}></div>
             </div>
           )}
+
+          <ProblemMergeDialog
+            isOpen={showProblemMergePrompt}
+            conflicts={problemMergeConflicts}
+            selectedChoices={selectedProblemChoices}
+            rememberChoices={rememberCurrentChoices}
+            onSelectedChoicesChange={setSelectedProblemChoices}
+            onRememberChoicesChange={setRememberCurrentChoices}
+            onConfirm={(choices) => {
+              setShowProblemMergePrompt(false);
+              problemMergeResolverRef.current?.({ choices });
+              problemMergeResolverRef.current = null;
+            }}
+            onCancel={() => {
+              setShowProblemMergePrompt(false);
+              problemMergeResolverRef.current?.(null);
+              problemMergeResolverRef.current = null;
+            }}
+            onRemembered={setRememberedMergeChoices}
+            getProblemDetail={getProblemDetail}
+          />
 
           {/* Settings Modal */}
           {showSettings && (
@@ -720,7 +883,7 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
                     <FontAwesomeIcon icon={faHistory} className="text-xl w-6" />
                     <span className="text-base">{t('messages:versionControl.title')}</span>
                   </button>
-                  <div className="divider my-1">云同步</div>
+                  {/* <div className="divider my-1">云同步</div> */}
 
                   {/* Online Sync */}
                   <button className="btn btn-outline btn-lg justify-start gap-4 h-14" onClick={() => { setShowSettings(false); setShowOnlineManager(true); }}>
@@ -881,10 +1044,10 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
                 <h3 className="font-bold text-lg">{confirmModalContent.title}</h3>
                 <p className="py-4">{confirmModalContent.content}</p>
                 <div className="modal-action">
-                  <button className="btn btn-ghost" onClick={() => { setShowConfirmModal(false); pendingAction?.(); }}>
+                  <button className="btn btn-ghost" onClick={() => { setShowConfirmModal(false); setPendingAction(null); }}>
                     {t('common:cancel')}
                   </button>
-                  <button className="btn btn-primary" onClick={() => { setShowConfirmModal(false); pendingAction?.(); }}>
+                  <button className="btn btn-primary" onClick={() => { setShowConfirmModal(false); pendingAction?.(); setPendingAction(null); }}>
                     {t('common:continue')}
                   </button>
                 </div>
@@ -892,6 +1055,27 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
               <div className="modal-backdrop" onClick={() => setShowConfirmModal(false)}></div>
             </div>
           )}
+
+            <ProblemMergeDialog
+              isOpen={showProblemMergePrompt}
+              conflicts={problemMergeConflicts}
+              selectedChoices={selectedProblemChoices}
+              rememberChoices={rememberCurrentChoices}
+              onSelectedChoicesChange={setSelectedProblemChoices}
+              onRememberChoicesChange={setRememberCurrentChoices}
+              onConfirm={(choices) => {
+                setShowProblemMergePrompt(false);
+                problemMergeResolverRef.current?.({ choices });
+                problemMergeResolverRef.current = null;
+              }}
+              onCancel={() => {
+                setShowProblemMergePrompt(false);
+                problemMergeResolverRef.current?.(null);
+                problemMergeResolverRef.current = null;
+              }}
+              onRemembered={setRememberedMergeChoices}
+              getProblemDetail={getProblemDetail}
+            />
 
           {/* Settings Modal */}
           {showSettings && (
@@ -976,7 +1160,7 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
                     <FontAwesomeIcon icon={faHistory} className="text-xl w-6" />
                     <span className="text-base">{t('messages:versionControl.title')}</span>
                   </button>
-                  <div className="divider my-1">云同步</div>
+                  {/* <div className="divider my-1">云同步</div> */}
 
                   {/* Online Sync */}
                   <button className="btn btn-outline btn-lg justify-start gap-4 h-14" onClick={() => { setShowSettings(false); setShowOnlineManager(true); }}>
