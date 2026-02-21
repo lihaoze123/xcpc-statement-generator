@@ -2,15 +2,15 @@
 #import "@preview/cmarker:0.1.6": render as cmarker-render
 #import "@preview/mitex:0.2.6": *
 
-#let md = cmarker-render.with(math: mitex, scope: (image: (source, alt: none, format: auto) => image(source, alt: alt, format: format)))
-
 #let fonts = (
   serif: ("New Computer Modern Math", "FZShuSong-Z01"),
   sans: ("CMU Sans Serif", "FZHei-B01"),
   kaishu: ("FZKai-Z03",),
   songti-bold: ("New Computer Modern Math", "FZXiaoBiaoSong-B05"),
-  mono: ("FiraCode Nerd Font",)
+  mono: ("CMU Typewriter Text",)
 )
+#let md = cmarker-render.with(math: mitex, scope: (image: (source, alt: none, format: auto) => image(source, alt: alt, format: format)))
+#let mitex-scope = (..mitex-scope, texttt: (s) => text(font: fonts.mono, s))
 
 #let maketitle(
   title: none,
@@ -48,8 +48,8 @@
     examples: "样例",
     note: "提示",
     problem-list: "试题列表",
-    stdin: "标准输入",
-    stdout: "标准输出",
+    stdin: "standard input",
+    stdout: "standard output",
     problem-set-info: (n, m) => [本试题册共 #n 题，#m 页。],
     missing-warning: "如果您的试题册缺少页面，请立即通知志愿者。",
   ),
@@ -67,9 +67,8 @@
 )
 
 #let render-problem(problem, statement, language: "zh") = [
-  #v(-10pt)
-  = #text(font: fonts.sans, size: 20pt)[#problem.display-name]
-  #v(10pt)
+  #text(font: fonts.sans, size: 20.74pt, weight: "bold")[#problem.display-name]
+  #v(3mm)
 
   #let format = problem.at("format", default: "latex")
   #if format == "latex" {
@@ -80,10 +79,11 @@
   } else {
     eval(statement.description, mode: "markup")
   }
-  #v(0.5em)
 
   #if statement.at("input", default: none) != none and statement.input != "" [
-    == #text(font: fonts.sans, size: 15pt)[#translations.at(language).input]
+    #v(3.5pt)
+    #text(font: fonts.sans, size: 17.28pt, weight: "bold")[#translations.at(language).input]
+    #v(3.5pt)
     #if format == "latex" {
       let res = mitex-convert(mode: "text", statement.input)
       eval(res, mode: "markup", scope: mitex-scope)
@@ -93,10 +93,11 @@
       eval(statement.input, mode: "markup")
     }
   ]
-  #v(0.5em)
 
   #if statement.at("output", default: none) != none and statement.output != "" [
-    == #text(font: fonts.sans, size: 15pt)[#translations.at(language).output]
+    #v(3.5pt)
+    #text(font: fonts.sans, size: 17.28pt, weight: "bold")[#translations.at(language).output]
+    #v(3.5pt)
     #if format == "latex" {
       let res = mitex-convert(mode: "text", statement.output)
       eval(res, mode: "markup", scope: mitex-scope)
@@ -106,25 +107,32 @@
       eval(statement.output, mode: "markup")
     }
   ]
-  #v(0.5em)
 
   #if problem.samples.len() > 0 [
-    == #text(font: fonts.sans, size: 15pt)[#translations.at(language).examples]
+    #v(3.5pt)
+    #text(font: fonts.sans, size: 17.28pt, weight: "bold")[#translations.at(language).examples]
+    #v(3.5pt)
 
-    #figure(
-      table(
-        columns: (7.2cm, 7.2cm),
-        align: (x, y) => if y == 0 { center } else { left },
-        stroke: 0.4pt,
-        table.header([#translations.at(language).stdin], [#translations.at(language).stdout]),
-        ..problem.samples.map(s => (raw(s.input), raw(s.output))).flatten(),
+    #table(
+      columns: (75.25mm + 12pt, 75.25mm + 12pt),
+      align: (x, y) => if y == 0 { center } else { left + top },
+      stroke: 0.4pt,
+      inset: 4pt,
+      table.header(
+        [#[#text(font: fonts.mono, weight: "bold", raw(translations.at(language).stdin))]],
+        [#[#text(font: fonts.mono, weight: "bold", raw(translations.at(language).stdout))]]
       ),
+      ..problem.samples.map(s => (
+        block(width: 100%, inset: (bottom: 6pt), raw(s.input)), 
+        block(width: 100%, inset: (bottom: 6pt), raw(s.output))
+      )).flatten(),
     )
   ]
-  #v(0.5em)
 
   #if statement.at("notes", default: none) != none and statement.notes != "" [
-    == #text(font: fonts.sans, size: 15pt)[#translations.at(language).note]
+    #v(3.5pt)
+    #text(font: fonts.sans, size: 17.28pt, weight: "bold")[#translations.at(language).note]
+    #v(3.5pt)
     #if format == "latex" {
       let res = mitex-convert(mode: "text", statement.notes)
       eval(res, mode: "markup", scope: mitex-scope)
@@ -154,22 +162,20 @@
 ) = {
   let titlepage-lang = if titlepage-language == auto { language } else { titlepage-language }
   let problem-lang = if problem-language == auto { language } else { problem-language }
-  set text(lang: "zh", font: fonts.serif)
+  set text(lang: "zh", font: fonts.serif, size: 12pt)
   set document(title: title, author: author)
 
   show strong: set text(font: fonts.songti-bold, weight: "bold")
   show raw: set text(font: fonts.mono)
 
-  // 封面页
   if enable-titlepage {
     set page(
       paper: "a4",
-      margin: (top: 8cm, bottom: 3cm, left: 2.5cm, right: 2.5cm),
+      margin: (top: 8cm, bottom: 3cm, left: 17.5mm, right: 17.5mm),
     )
     set par(spacing: 0.8em)
     maketitle(title: title, subtitle: subtitle, date: date, author: author)
 
-    // TOC
     if enable-problem-list {
       figure(
         placement: bottom,
@@ -193,7 +199,6 @@
           #table(
             columns: (1.4cm, 6cm),
             align: center,
-            // stroke: 0.4pt,
             ..problems.enumerate().map(((i, e)) => (
               str.from-unicode(int(i) + 65), e.problem.display_name
             )).flatten()
@@ -209,31 +214,30 @@
     }
   }
 
-  // 题面
   {
-    set par(justify: true, spacing: 0.65em)
-    show heading: set block(above: 0.6em)
-    show heading: set text(font: fonts.sans)
+    set par(justify: true, spacing: 0.5em, first-line-indent: 0mm)
 
     set page(
       paper: "a4",
-      margin: (top: 3cm, bottom: 2.5cm, x: 2.5cm),
+      margin: (top: 26mm, bottom: 35mm, left: 17.5mm, right: 17.5mm),
+      header-ascent: 6mm,
       header: if enable-header-footer {
         [
-          #set text(size: 10pt)
+          #set text(size: 12pt, font: fonts.sans)
           #grid(
             columns: (1fr, 1fr),
             align: (left, right),
             [#title], [#date],
           )
-          #v(-0.1cm)
-          #line(length: 100%, stroke: 0.5pt)
+          #v(-1pt)
+          #line(length: 100%, stroke: 0.4pt)
         ]
       },
       footer: if enable-header-footer {
         context [
           #set align(center)
-          #line(length: 100%, stroke: 0.5pt)
+          #line(length: 100%, stroke: 0.4pt)
+          #v(6pt)
           #set text(font: fonts.sans)
           #counter(page).display(
             numbly("{1}", { "Page {1} of {2}" }),
