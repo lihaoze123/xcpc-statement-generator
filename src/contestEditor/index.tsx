@@ -349,7 +349,7 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
       content: t('messages:deleteProblemConfirm.content'),
     });
 
-    setPendingAction(() => {
+    setPendingAction(() => () => {
       updateContestData((draft) => {
         const idx = draft.problems.findIndex((p) => p.key === key);
         if (idx !== -1) draft.problems.splice(idx, 1);
@@ -636,10 +636,10 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
                 <h3 className="font-bold text-lg">{confirmModalContent.title}</h3>
                 <p className="py-4">{confirmModalContent.content}</p>
                 <div className="modal-action">
-                  <button className="btn btn-ghost" onClick={() => { setShowConfirmModal(false); pendingAction?.(); }}>
+                  <button className="btn btn-ghost" onClick={() => { setShowConfirmModal(false); setPendingAction(null); }}>
                     {t('common:cancel')}
                   </button>
-                  <button className="btn btn-primary" onClick={() => { setShowConfirmModal(false); pendingAction?.(); }}>
+                  <button className="btn btn-primary" onClick={() => { setShowConfirmModal(false); pendingAction?.(); setPendingAction(null); }}>
                     {t('common:continue')}
                   </button>
                 </div>
@@ -892,10 +892,10 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
                 <h3 className="font-bold text-lg">{confirmModalContent.title}</h3>
                 <p className="py-4">{confirmModalContent.content}</p>
                 <div className="modal-action">
-                  <button className="btn btn-ghost" onClick={() => { setShowConfirmModal(false); pendingAction?.(); }}>
+                  <button className="btn btn-ghost" onClick={() => { setShowConfirmModal(false); setPendingAction(null); }}>
                     {t('common:cancel')}
                   </button>
-                  <button className="btn btn-primary" onClick={() => { setShowConfirmModal(false); pendingAction?.(); }}>
+                  <button className="btn btn-primary" onClick={() => { setShowConfirmModal(false); pendingAction?.(); setPendingAction(null); }}>
                     {t('common:continue')}
                   </button>
                 </div>
