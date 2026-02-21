@@ -25,7 +25,7 @@ export const exampleStatements: Record<string, Contest> = {
           format: "latex"
         },
         statement: {
-          description: "\\begin{tabular}{ll}\n    Input file: & standard input \\\\\n    Output file: & standard output \\\\\n    Time Limit: & 1 second \\\\\n    Memory Limit: & 512 megabytes \\\\\n\\end{tabular}\n\nGiven a string $S$, output \"Hello, $S$!\"",
+          description: "\\begin{tabular}{ll}\n    Input file: & \\texttt{standard input} \\\\\n    Output file: & \\texttt{standard output} \\\\\n    Time Limit: & 1 second \\\\\n    Memory Limit: & 512 megabytes \\\\\n\\end{tabular}\n\nGiven a string $S$, output \"Hello, $S$!\"",
           input: "Input a string $S$.",
           output: "Output the answer.",
           notes: "The length of the string does not exceed 100.",
@@ -138,7 +138,7 @@ export const exampleStatements: Record<string, Contest> = {
           format: "latex"
         },
         statement: {
-          description: "\\begin{tabular}{ll}\n    Input file: & standard input \\\\\n    Output file: & standard output \\\\\n    Time Limit: & 1 second \\\\\n    Memory Limit: & 512 megabytes \\\\\n\\end{tabular}\n\n给定一个字符串 $S$，输出 “Hello, $S$!”",
+          description: "\\begin{tabular}{ll}\n    Input file: & \\texttt{standard input} \\\\\n    Output file: & \\texttt{standard output} \\\\\n    Time Limit: & 1 second \\\\\n    Memory Limit: & 512 megabytes \\\\\n\\end{tabular}\n\n给定一个字符串 $S$，输出 “Hello, $S$!”",
           input: "输入一个字符串 $S$。",
           output: "输出答案。",
           notes: "字符串长度不超过 100。",

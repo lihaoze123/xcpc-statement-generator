@@ -2,15 +2,15 @@
 #import "@preview/cmarker:0.1.6": render as cmarker-render
 #import "@preview/mitex:0.2.6": *
 
-#let md = cmarker-render.with(math: mitex, scope: (image: (source, alt: none, format: auto) => image(source, alt: alt, format: format)))
-
 #let fonts = (
   serif: ("New Computer Modern Math", "FZShuSong-Z01"),
   sans: ("CMU Sans Serif", "FZHei-B01"),
   kaishu: ("FZKai-Z03",),
   songti-bold: ("New Computer Modern Math", "FZXiaoBiaoSong-B05"),
-  mono: ("FiraCode Nerd Font",)
+  mono: ("CMU Typewriter Text",)
 )
+#let md = cmarker-render.with(math: mitex, scope: (image: (source, alt: none, format: auto) => image(source, alt: alt, format: format)))
+#let mitex-scope = (..mitex-scope, texttt: (s) => text(font: fonts.mono, s))
 
 #let maketitle(
   title: none,
