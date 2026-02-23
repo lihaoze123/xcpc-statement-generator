@@ -103,7 +103,7 @@ const OnlineManager: FC<OnlineManagerProps> = ({
         return { accessKeyId: r2AccessKeyId, secretAccessKey: r2SecretAccessKey, bucket: r2Bucket, accountId: r2AccountId, directory: r2Directory || undefined, contestTitle: contestTitle || undefined };
     }
   };
-
+  
   const applyPlatformDraft = (nextPlatform: "cos" | "oss" | "github" | "r2", draft?: any) => {
     setContestTitle(draft?.contestTitle || contestData.meta.title || "");
     if (nextPlatform === "cos") {
@@ -292,6 +292,8 @@ const OnlineManager: FC<OnlineManagerProps> = ({
       localStorage.setItem("onlineSyncSettings", JSON.stringify(newSettings));
       setShowConfig(false);
       showToast(t("online:config_saved"), "success");
+
+      await uploadWithConfig(config);
     } catch (error: any) {
       console.error("Save settings error:", error);
       showToast(`Error: ${error?.message || "Unknown error"}`, "error");
@@ -324,94 +326,14 @@ const OnlineManager: FC<OnlineManagerProps> = ({
     }
   };
 
-  // 上传到云�?
-  const getSyncContestTitle = () => settings.config?.contestTitle?.trim() || contestData.meta.title;
+  // 上传到云端
+  const getSyncContestTitle = (config?: OnlineSyncConfig | null) =>
+    config?.contestTitle?.trim() || contestData.meta.title;
 
-  const handleUpload = async () => {
-    if (!settings.config) {
-      showToast(t("online:error.no_config"), "error");
-      setShowConfig(true);
-      return;
-    }
-
-    try {
-      const exists = await checkOnlineExists(settings.config, getSyncContestTitle());
-      if (exists) {
-        const choice = await requestConflictChoice();
-        setShowConflictPrompt(false);
-        conflictResolverRef.current = null;
-
-        if (choice === "cloud") {
-          await handleDownload();
-          return;
-        }
-        if (choice !== "local") {
-          return;
-        }
-      }
-    } catch (error: any) {
-      console.error("Check online exists error:", error);
-      showToast(t("online:upload_failed"), "error");
-      return;
-    }
-
-    setIsUploading(true);
-    try {
-      // 获取所有版本和分支
-      const versions = await getAllVersions();
-      const branches = await getAllBranches();
-
-      // 准备图片 Map
-      const images = new Map<string, Blob>();
-      for (const img of contestData.images) {
-        const response = await fetch(img.url);
-        const blob = await response.blob();
-        images.set(img.uuid, blob);
-      }
-
-      // 上传数据
-      await uploadToOnline(settings.config, getSyncContestTitle(), {
-        contest: {
-          meta: contestData.meta,
-          problems: contestData.problems.map(({ key, ...rest }) => rest),
-          images: contestData.images.map((img) => ({ uuid: img.uuid, name: img.name })),
-          template: contestData.template,
-        },
-        images,
-        versions,
-        branches,
-      });
-
-      // 更新最后同步时�?
-      const newSettings = {
-        ...settings,
-        lastSyncTime: Date.now(),
-      };
-      setSettings(newSettings);
-      localStorage.setItem("onlineSyncSettings", JSON.stringify(newSettings));
-
-      onSyncComplete?.(newSettings.lastSyncTime);
-
-      showToast(t("online:upload_success"), "success");
-    } catch (error: any) {
-      console.error("Upload error:", error);
-      showToast(t("online:upload_failed"), "error");
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  // 从云端下�?
-  const handleDownload = async () => {
-    if (!settings.config) {
-      showToast(t("online:error.no_config"), "error");
-      setShowConfig(true);
-      return;
-    }
-
+  const downloadWithConfig = async (config: OnlineSyncConfig) => {
     setIsDownloading(true);
     try {
-      const data = await downloadFromOnline(settings.config, getSyncContestTitle());
+      const data = await downloadFromOnline(config, getSyncContestTitle(config));
 
       if (!data) {
         showToast(t("online:no_data_found"), "warning");
@@ -448,7 +370,7 @@ const OnlineManager: FC<OnlineManagerProps> = ({
         }
       }
 
-      // 通知父组件刷�?
+      // 通知父组件刷新
       const imageData = Array.from(data.images.entries() as IterableIterator<[string, Blob]>).map(([uuid, blob]) => ({
         uuid,
         name: data.contest.images?.find((img) => img.uuid === uuid)?.name || uuid,
@@ -465,15 +387,22 @@ const OnlineManager: FC<OnlineManagerProps> = ({
         template: data.contest.template,
       });
 
-      // 更新最后同步时�?
-      const newSettings = {
+      // 更新最后同步时间
+      const syncedAt = Date.now();
+      setSettings((prev) => ({
+        ...prev,
+        config,
+        enabled: true,
+        lastSyncTime: syncedAt,
+      }));
+      localStorage.setItem("onlineSyncSettings", JSON.stringify({
         ...settings,
-        lastSyncTime: Date.now(),
-      };
-      setSettings(newSettings);
-      localStorage.setItem("onlineSyncSettings", JSON.stringify(newSettings));
+        config,
+        enabled: true,
+        lastSyncTime: syncedAt,
+      }));
 
-      onSyncComplete?.(newSettings.lastSyncTime);
+      onSyncComplete?.(syncedAt);
 
       showToast(t("online:download_success"), "success");
     } catch (error: any) {
@@ -482,6 +411,104 @@ const OnlineManager: FC<OnlineManagerProps> = ({
     } finally {
       setIsDownloading(false);
     }
+  };
+
+  const uploadWithConfig = async (config: OnlineSyncConfig) => {
+    if (isUploading) return;
+
+    try {
+      const exists = await checkOnlineExists(config, getSyncContestTitle(config));
+      if (exists) {
+        const choice = await requestConflictChoice();
+        setShowConflictPrompt(false);
+        conflictResolverRef.current = null;
+
+        if (choice === "cloud") {
+          await downloadWithConfig(config);
+          return;
+        }
+        if (choice !== "local") {
+          return;
+        }
+      }
+    } catch (error: any) {
+      console.error("Check online exists error:", error);
+      showToast(t("online:upload_failed"), "error");
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      // 获取所有版本和分支
+      const versions = await getAllVersions();
+      const branches = await getAllBranches();
+
+      // 准备图片 Map
+      const images = new Map<string, Blob>();
+      for (const img of contestData.images) {
+        const response = await fetch(img.url);
+        const blob = await response.blob();
+        images.set(img.uuid, blob);
+      }
+
+      // 上传数据
+      await uploadToOnline(config, getSyncContestTitle(config), {
+        contest: {
+          meta: contestData.meta,
+          problems: contestData.problems.map(({ key, ...rest }) => rest),
+          images: contestData.images.map((img) => ({ uuid: img.uuid, name: img.name })),
+          template: contestData.template,
+        },
+        images,
+        versions,
+        branches,
+      });
+
+      // 更新最后同步时间
+      const syncedAt = Date.now();
+      setSettings((prev) => ({
+        ...prev,
+        config,
+        enabled: true,
+        lastSyncTime: syncedAt,
+      }));
+      localStorage.setItem("onlineSyncSettings", JSON.stringify({
+        ...settings,
+        config,
+        enabled: true,
+        lastSyncTime: syncedAt,
+      }));
+
+      onSyncComplete?.(syncedAt);
+
+      showToast(t("online:upload_success"), "success");
+    } catch (error: any) {
+      console.error("Upload error:", error);
+      showToast(t("online:upload_failed"), "error");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!settings.config) {
+      showToast(t("online:error.no_config"), "error");
+      setShowConfig(true);
+      return;
+    }
+
+    await uploadWithConfig(settings.config);
+  };
+
+  // 从云端下�?
+  const handleDownload = async () => {
+    if (!settings.config) {
+      showToast(t("online:error.no_config"), "error");
+      setShowConfig(true);
+      return;
+    }
+
+    await downloadWithConfig(settings.config);
   };
 
   // 切换自动同步
