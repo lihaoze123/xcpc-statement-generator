@@ -12,10 +12,16 @@ export interface Sample {
 export type ProblemFormat = "typst" | "latex" | "markdown";
 
 // 题目元数据
+export interface ProblemLimit {
+  key: string;
+  value: string;
+}
+
 export interface ProblemMetadata {
   display_name: string;
   format?: ProblemFormat; // 默认为 typst
   samples: Sample[];
+  limits?: ProblemLimit[];
 }
 
 // 题目描述

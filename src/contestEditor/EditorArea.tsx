@@ -1,5 +1,5 @@
 import { type FC, useState } from "react";
-import type { ContestWithImages, Problem, ProblemFormat, ImageData, AutoLanguageOption } from "@/types/contest";
+import type { ContestWithImages, Problem, ProblemFormat, ImageData, AutoLanguageOption, ProblemLimit } from "@/types/contest";
 import { useTranslation } from "react-i18next";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTrash, faInbox, faCopy, faChevronDown, faFilePdf } from "@fortawesome/free-solid-svg-icons";
@@ -261,6 +261,68 @@ const ImageManagement: FC<ConfigFormProps> = ({ contestData, updateContestData }
   );
 };
 
+const ProblemLimitsEditor: FC<{
+  limits: ProblemLimit[];
+  onChange: (next: ProblemLimit[]) => void;
+}> = ({ limits, onChange }) => {
+  const updateLimit = (index: number, key: string, value: string) => {
+    const next = limits.map((item, i) => i === index ? { key, value } : item);
+    onChange(next);
+  };
+
+  const addLimit = () => {
+    onChange([...limits, { key: "", value: "" }]);
+  };
+
+  const removeLimit = (index: number) => {
+    const next = limits.filter((_, i) => i !== index);
+    onChange(next);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-gray-700">题目限制</h3>
+        <button className="btn btn-sm btn-outline" onClick={addLimit}>
+          添加限制
+        </button>
+      </div>
+
+      {limits.length === 0 ? (
+        <div className="text-sm text-gray-400">暂无限制项，点击“添加限制”开始。</div>
+      ) : (
+        <div className="space-y-2">
+          {limits.map((item, index) => (
+            <div key={index} className="grid grid-cols-12 gap-2 items-center">
+              <input
+                type="text"
+                className="input input-bordered input-sm col-span-4"
+                placeholder="键 (如 时间限制)"
+                value={item.key}
+                onChange={(e) => updateLimit(index, e.target.value, item.value)}
+              />
+              <input
+                type="text"
+                className="input input-bordered input-sm col-span-7"
+                placeholder="值 (如 1s / 512MB)"
+                value={item.value}
+                onChange={(e) => updateLimit(index, item.key, e.target.value)}
+              />
+              <button
+                className="btn btn-ghost btn-sm text-red-500 col-span-1 min-w-[50px]"
+                onClick={() => removeLimit(index)}
+                title="删除"
+              >
+                删除
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const SingleProblemEditor: FC<{
   problem: Problem;
   index: number;
@@ -273,7 +335,7 @@ const SingleProblemEditor: FC<{
   onSyncStatusClick?: () => void;
 }> = ({ problem, index, onUpdate, onDelete, onExport, vimMode = false, syncStatus = 'disabled', lastSyncTime, onSyncStatusClick }) => {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<TabId>("description");
+  const [activeTab, setActiveTab] = useState<TabId>("limits");
 
   const lang = problem.problem.format === "markdown" ? "markdown"
     : problem.problem.format === "typst" ? "typst"
@@ -331,6 +393,13 @@ const SingleProblemEditor: FC<{
             samples={problem.problem.samples}
             onUpdate={(samples) => onUpdate((p) => { p.problem.samples = samples; })}
             vimMode={vimMode}
+          />
+        );
+      case "limits":
+        return (
+          <ProblemLimitsEditor
+            limits={problem.problem.limits || []}
+            onChange={(next) => onUpdate((p) => { p.problem.limits = next; })}
           />
         );
     }

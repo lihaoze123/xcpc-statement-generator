@@ -11,7 +11,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFileCode, faLanguage, faUpload, faFileZipper, faX, faImages, faChevronDown, faArrowsDownToLine, faHistory, faCloud } from "@fortawesome/free-solid-svg-icons";
 
-import type { ContestWithImages, ImageData } from "@/types/contest";
+import type { ContestWithImages, ImageData, ProblemLimit } from "@/types/contest";
 import { exampleStatements } from "./exampleStatements";
 import { compileToPdf, compileProblemToPdf, typstInitPromise, registerImages } from "@/compiler";
 import { saveConfigToDB, loadConfigFromDB, exportConfig, importConfig, clearDB, saveImageToDB } from "@/utils/indexedDBUtils";
@@ -33,6 +33,15 @@ import TemplateEditor from "./TemplateEditor";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 import "./index.css";
+
+const defaultProblemLimits: ProblemLimit[] = [
+  { key: "Input file", value: "standard input" },
+  { key: "Output file", value: "standard output" },
+  { key: "Time Limit", value: "1 second" },
+  { key: "Memory Limit", value: "512 megabytes" },
+  // { key: "author", value: "" },
+  // { key: "color", value: "" },
+];
 
 const SortableReorderItem: FC<{ problem: ContestWithImages['problems'][0]; index: number }> = ({ problem, index }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: problem.key! });
@@ -466,7 +475,7 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
     updateContestData((draft) => {
       draft.problems.push({
         key: newKey,
-        problem: { display_name: "New Problem", samples: [{ input: "", output: "" }] },
+        problem: { display_name: "New Problem", samples: [{ input: "", output: "" }], limits: defaultProblemLimits.map((limit) => ({ ...limit })) },
         statement: { description: "", input: "", output: "", notes: "" },
       });
     });
