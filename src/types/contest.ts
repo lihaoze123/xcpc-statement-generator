@@ -127,6 +127,7 @@ export interface COSConfig {
   bucket: string;
   region: string;
   directory?: string; // 可选的目录前缀
+  contestTitle?: string;
 }
 
 export interface OSSConfig {
@@ -136,6 +137,7 @@ export interface OSSConfig {
   bucket: string;
   region: string;
   directory?: string; // 可选的目录前缀
+  contestTitle?: string;
 }
 
 export interface GitHubConfig {
@@ -143,6 +145,7 @@ export interface GitHubConfig {
   token: string;
   repo: string;
   directory?: string;
+  contestTitle?: string;
 }
 
 export interface R2Config {
@@ -152,6 +155,7 @@ export interface R2Config {
   bucket: string;
   accountId: string;
   directory?: string;
+  contestTitle?: string;
 }
 
 export type OnlineSyncConfig = COSConfig | OSSConfig | GitHubConfig | R2Config;

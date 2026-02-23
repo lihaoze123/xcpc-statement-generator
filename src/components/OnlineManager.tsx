@@ -50,6 +50,9 @@ const OnlineManager: FC<OnlineManagerProps> = ({
   const [showConflictPrompt, setShowConflictPrompt] = useState(false);
   const conflictResolverRef = useRef<((choice: "cloud" | "local" | "cancel") => void) | null>(null);
 
+  // 同步比赛标题
+  const [contestTitle, setContestTitle] = useState(contestData.meta.title || "");
+
   // COS 配置
   const [cosSecretId, setCosSecretId] = useState("");
   const [cosSecretKey, setCosSecretKey] = useState("");
@@ -91,17 +94,18 @@ const OnlineManager: FC<OnlineManagerProps> = ({
   const snapshotCurrentPlatform = () => {
     switch (platform) {
       case "cos":
-        return { secretId: cosSecretId, secretKey: cosSecretKey, bucket: cosBucket, region: cosRegion, directory: cosDirectory || undefined };
+        return { secretId: cosSecretId, secretKey: cosSecretKey, bucket: cosBucket, region: cosRegion, directory: cosDirectory || undefined, contestTitle: contestTitle || undefined };
       case "oss":
-        return { accessKeyId: ossAccessKeyId, accessKeySecret: ossAccessKeySecret, bucket: ossBucket, region: ossRegion, directory: ossDirectory || undefined };
+        return { accessKeyId: ossAccessKeyId, accessKeySecret: ossAccessKeySecret, bucket: ossBucket, region: ossRegion, directory: ossDirectory || undefined, contestTitle: contestTitle || undefined };
       case "github":
-        return { token: githubToken, repo: githubRepo, directory: githubDirectory || undefined };
+        return { token: githubToken, repo: githubRepo, directory: githubDirectory || undefined, contestTitle: contestTitle || undefined };
       case "r2":
-        return { accessKeyId: r2AccessKeyId, secretAccessKey: r2SecretAccessKey, bucket: r2Bucket, accountId: r2AccountId, directory: r2Directory || undefined };
+        return { accessKeyId: r2AccessKeyId, secretAccessKey: r2SecretAccessKey, bucket: r2Bucket, accountId: r2AccountId, directory: r2Directory || undefined, contestTitle: contestTitle || undefined };
     }
   };
 
   const applyPlatformDraft = (nextPlatform: "cos" | "oss" | "github" | "r2", draft?: any) => {
+    setContestTitle(draft?.contestTitle || contestData.meta.title || "");
     if (nextPlatform === "cos") {
       setCosSecretId(draft?.secretId || "");
       setCosSecretKey(draft?.secretKey || "");
@@ -161,6 +165,7 @@ const OnlineManager: FC<OnlineManagerProps> = ({
       setSettings(parsed);
       if (parsed.config) {
         const cfg = parsed.config;
+        setContestTitle(cfg.contestTitle || contestData.meta.title || "");
         if (cfg.platform === "cos") {
           setPlatform("cos");
           setCosSecretId(cfg.secretId || "");
@@ -195,6 +200,7 @@ const OnlineManager: FC<OnlineManagerProps> = ({
   // 保存配置
   const saveSettings = async () => {
     let config: OnlineSyncConfig | null = null;
+    const normalizedContestTitle = contestTitle.trim() || contestData.meta.title;
 
     if (platform === "cos") {
       if (!cosSecretId || !cosSecretKey || !cosBucket || !cosRegion) {
@@ -208,6 +214,7 @@ const OnlineManager: FC<OnlineManagerProps> = ({
         bucket: cosBucket,
         region: cosRegion,
         directory: cosDirectory || undefined,
+        contestTitle: normalizedContestTitle,
       };
     } else if (platform === "oss") {
       if (!ossAccessKeyId || !ossAccessKeySecret || !ossBucket || !ossRegion) {
@@ -221,6 +228,7 @@ const OnlineManager: FC<OnlineManagerProps> = ({
         bucket: ossBucket,
         region: ossRegion,
         directory: ossDirectory || undefined,
+        contestTitle: normalizedContestTitle,
       };
     } else if (platform === "github") {
       if (!githubToken || !githubRepo) {
@@ -232,6 +240,7 @@ const OnlineManager: FC<OnlineManagerProps> = ({
         token: githubToken,
         repo: githubRepo,
         directory: githubDirectory || undefined,
+        contestTitle: normalizedContestTitle,
       };
     } else if (platform === "r2") {
       if (!r2AccessKeyId || !r2SecretAccessKey || !r2Bucket || !r2AccountId) {
@@ -245,9 +254,15 @@ const OnlineManager: FC<OnlineManagerProps> = ({
         bucket: r2Bucket,
         accountId: r2AccountId,
         directory: r2Directory || undefined,
+        contestTitle: normalizedContestTitle,
       };
     } else {
       showToast(t("online:error.not_implemented"), "error");
+      return;
+    }
+
+    if (!config) {
+      showToast(t("online:error.no_config"), "error");
       return;
     }
 
@@ -310,6 +325,8 @@ const OnlineManager: FC<OnlineManagerProps> = ({
   };
 
   // 上传到云�?
+  const getSyncContestTitle = () => settings.config?.contestTitle?.trim() || contestData.meta.title;
+
   const handleUpload = async () => {
     if (!settings.config) {
       showToast(t("online:error.no_config"), "error");
@@ -318,7 +335,7 @@ const OnlineManager: FC<OnlineManagerProps> = ({
     }
 
     try {
-      const exists = await checkOnlineExists(settings.config, contestData.meta.title);
+      const exists = await checkOnlineExists(settings.config, getSyncContestTitle());
       if (exists) {
         const choice = await requestConflictChoice();
         setShowConflictPrompt(false);
@@ -353,7 +370,7 @@ const OnlineManager: FC<OnlineManagerProps> = ({
       }
 
       // 上传数据
-      await uploadToOnline(settings.config, contestData.meta.title, {
+      await uploadToOnline(settings.config, getSyncContestTitle(), {
         contest: {
           meta: contestData.meta,
           problems: contestData.problems.map(({ key, ...rest }) => rest),
@@ -394,7 +411,7 @@ const OnlineManager: FC<OnlineManagerProps> = ({
 
     setIsDownloading(true);
     try {
-      const data = await downloadFromOnline(settings.config, contestData.meta.title);
+      const data = await downloadFromOnline(settings.config, getSyncContestTitle());
 
       if (!data) {
         showToast(t("online:no_data_found"), "warning");
@@ -560,6 +577,16 @@ const OnlineManager: FC<OnlineManagerProps> = ({
             </div>
           ) : (
             <div className="space-y-3">
+              <div>
+                <label className="block text-sm text-gray-600 mb-2">比赛标题（用于同步）</label>
+                <input
+                  type="text"
+                  placeholder="默认使用当前比赛标题"
+                  value={contestTitle}
+                  onChange={(e) => setContestTitle(e.target.value)}
+                  className="w-full px-3 py-2 border rounded text-sm"
+                />
+              </div>
               <div>
                 <label className="block text-sm text-gray-600 mb-2">{t("online:select_platform")}</label>
                 <div className="grid grid-cols-2 gap-2">
