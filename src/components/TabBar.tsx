@@ -1,6 +1,6 @@
 import type { FC } from "react";
 
-export type TabId = "description" | "input" | "output" | "notes" | "samples";
+export type TabId = "description" | "input" | "output" | "notes" | "samples" | "limits";
 
 interface TabBarProps {
   activeTab: TabId;
@@ -8,6 +8,7 @@ interface TabBarProps {
 }
 
 const tabs: { id: TabId; label: string }[] = [
+  { id: "limits", label: "限制" },
   { id: "description", label: "描述" },
   { id: "input", label: "输入" },
   { id: "output", label: "输出" },

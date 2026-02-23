@@ -144,7 +144,8 @@ function buildTypstDocument(contest: ContestWithImages, problemKey?: string, use
       problem: {
         display_name: p.problem.display_name,
         format: p.problem.format || "latex",
-        samples: p.problem.samples.map(s => ({ input: s.input, output: s.output }))
+        samples: p.problem.samples.map(s => ({ input: s.input, output: s.output })),
+        limits: (p.problem.limits || []).map(l => ({ key: l.key, value: l.value })),
       },
       statement: {
         description: p.statement.description,
@@ -172,6 +173,10 @@ function buildTypstDocument(contest: ContestWithImages, problemKey?: string, use
       display_name: "${escapeTypstString(p.problem.display_name)}",
       format: "${p.problem.format}",
       samples: (${p.problem.samples.map((s) => `(input: "${escapeTypstString(s.input)}", output: "${escapeTypstString(s.output)}")`).join(", ")}${p.problem.samples.length === 1 ? ',' : ''})
+      ${p.problem.limits && p.problem.limits.length > 0
+        ? `,
+      limits: (${p.problem.limits.map((l) => `(key: "${escapeTypstString(l.key)}", value: "${escapeTypstString(l.value)}")`).join(", ")}${p.problem.limits.length === 1 ? ',' : ''})`
+        : ""}
     ),
     statement: (
       description: "${escapeTypstString(p.statement.description)}",
