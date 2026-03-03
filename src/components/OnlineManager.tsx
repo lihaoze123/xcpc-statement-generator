@@ -50,17 +50,22 @@ const OnlineManager: FC<OnlineManagerProps> = ({
   const [showConflictPrompt, setShowConflictPrompt] = useState(false);
   const conflictResolverRef = useRef<((choice: "cloud" | "local" | "cancel") => void) | null>(null);
 
+  // 同步比赛标题
+  const [contestTitle, setContestTitle] = useState(contestData.meta.title || "");
+
   // COS 配置
   const [cosSecretId, setCosSecretId] = useState("");
   const [cosSecretKey, setCosSecretKey] = useState("");
   const [cosBucket, setCosBucket] = useState("");
   const [cosRegion, setCosRegion] = useState("");
+  const [cosDirectory, setCosDirectory] = useState("");
 
   // OSS 配置
   const [ossAccessKeyId, setOssAccessKeyId] = useState("");
   const [ossAccessKeySecret, setOssAccessKeySecret] = useState("");
   const [ossBucket, setOssBucket] = useState("");
   const [ossRegion, setOssRegion] = useState("");
+  const [ossDirectory, setOssDirectory] = useState("");
 
   // GitHub 配置
   const [githubToken, setGithubToken] = useState("");
@@ -72,6 +77,7 @@ const OnlineManager: FC<OnlineManagerProps> = ({
   const [r2SecretAccessKey, setR2SecretAccessKey] = useState("");
   const [r2Bucket, setR2Bucket] = useState("");
   const [r2AccountId, setR2AccountId] = useState("");
+  const [r2Directory, setR2Directory] = useState("");
 
   const readConfigCache = () => {
     try {
@@ -88,27 +94,30 @@ const OnlineManager: FC<OnlineManagerProps> = ({
   const snapshotCurrentPlatform = () => {
     switch (platform) {
       case "cos":
-        return { secretId: cosSecretId, secretKey: cosSecretKey, bucket: cosBucket, region: cosRegion };
+        return { secretId: cosSecretId, secretKey: cosSecretKey, bucket: cosBucket, region: cosRegion, directory: cosDirectory || undefined, contestTitle: contestTitle || undefined };
       case "oss":
-        return { accessKeyId: ossAccessKeyId, accessKeySecret: ossAccessKeySecret, bucket: ossBucket, region: ossRegion };
+        return { accessKeyId: ossAccessKeyId, accessKeySecret: ossAccessKeySecret, bucket: ossBucket, region: ossRegion, directory: ossDirectory || undefined, contestTitle: contestTitle || undefined };
       case "github":
-        return { token: githubToken, repo: githubRepo, directory: githubDirectory };
+        return { token: githubToken, repo: githubRepo, directory: githubDirectory || undefined, contestTitle: contestTitle || undefined };
       case "r2":
-        return { accessKeyId: r2AccessKeyId, secretAccessKey: r2SecretAccessKey, bucket: r2Bucket, accountId: r2AccountId };
+        return { accessKeyId: r2AccessKeyId, secretAccessKey: r2SecretAccessKey, bucket: r2Bucket, accountId: r2AccountId, directory: r2Directory || undefined, contestTitle: contestTitle || undefined };
     }
   };
-
+  
   const applyPlatformDraft = (nextPlatform: "cos" | "oss" | "github" | "r2", draft?: any) => {
+    setContestTitle(draft?.contestTitle || contestData.meta.title || "");
     if (nextPlatform === "cos") {
       setCosSecretId(draft?.secretId || "");
       setCosSecretKey(draft?.secretKey || "");
       setCosBucket(draft?.bucket || "");
       setCosRegion(draft?.region || "");
+      setCosDirectory(draft?.directory || "");
     } else if (nextPlatform === "oss") {
       setOssAccessKeyId(draft?.accessKeyId || "");
       setOssAccessKeySecret(draft?.accessKeySecret || "");
       setOssBucket(draft?.bucket || "");
       setOssRegion(draft?.region || "");
+      setOssDirectory(draft?.directory || "");
     } else if (nextPlatform === "github") {
       setGithubToken(draft?.token || "");
       setGithubRepo(draft?.repo || "");
@@ -118,6 +127,7 @@ const OnlineManager: FC<OnlineManagerProps> = ({
       setR2SecretAccessKey(draft?.secretAccessKey || "");
       setR2Bucket(draft?.bucket || "");
       setR2AccountId(draft?.accountId || "");
+      setR2Directory(draft?.directory || "");
     }
   };
 
@@ -155,18 +165,21 @@ const OnlineManager: FC<OnlineManagerProps> = ({
       setSettings(parsed);
       if (parsed.config) {
         const cfg = parsed.config;
+        setContestTitle(cfg.contestTitle || contestData.meta.title || "");
         if (cfg.platform === "cos") {
           setPlatform("cos");
           setCosSecretId(cfg.secretId || "");
           setCosSecretKey(cfg.secretKey || "");
           setCosBucket(cfg.bucket || "");
           setCosRegion(cfg.region || "");
+          setCosDirectory(cfg.directory || "");
         } else if (cfg.platform === "oss") {
           setPlatform("oss");
           setOssAccessKeyId(cfg.accessKeyId || "");
           setOssAccessKeySecret(cfg.accessKeySecret || "");
           setOssBucket(cfg.bucket || "");
           setOssRegion(cfg.region || "");
+          setOssDirectory(cfg.directory || "");
         } else if (cfg.platform === "github") {
           setPlatform("github");
           setGithubToken(cfg.token || "");
@@ -178,14 +191,16 @@ const OnlineManager: FC<OnlineManagerProps> = ({
           setR2SecretAccessKey(cfg.secretAccessKey || "");
           setR2Bucket(cfg.bucket || "");
           setR2AccountId(cfg.accountId || "");
+          setR2Directory(cfg.directory || "");
         }
       }
     }
   }, []);
 
   // 保存配置
-  const saveSettings = () => {
+  const saveSettings = async () => {
     let config: OnlineSyncConfig | null = null;
+    const normalizedContestTitle = contestTitle.trim() || contestData.meta.title;
 
     if (platform === "cos") {
       if (!cosSecretId || !cosSecretKey || !cosBucket || !cosRegion) {
@@ -198,6 +213,8 @@ const OnlineManager: FC<OnlineManagerProps> = ({
         secretKey: cosSecretKey,
         bucket: cosBucket,
         region: cosRegion,
+        directory: cosDirectory || undefined,
+        contestTitle: normalizedContestTitle,
       };
     } else if (platform === "oss") {
       if (!ossAccessKeyId || !ossAccessKeySecret || !ossBucket || !ossRegion) {
@@ -210,6 +227,8 @@ const OnlineManager: FC<OnlineManagerProps> = ({
         accessKeySecret: ossAccessKeySecret,
         bucket: ossBucket,
         region: ossRegion,
+        directory: ossDirectory || undefined,
+        contestTitle: normalizedContestTitle,
       };
     } else if (platform === "github") {
       if (!githubToken || !githubRepo) {
@@ -221,6 +240,7 @@ const OnlineManager: FC<OnlineManagerProps> = ({
         token: githubToken,
         repo: githubRepo,
         directory: githubDirectory || undefined,
+        contestTitle: normalizedContestTitle,
       };
     } else if (platform === "r2") {
       if (!r2AccessKeyId || !r2SecretAccessKey || !r2Bucket || !r2AccountId) {
@@ -233,26 +253,53 @@ const OnlineManager: FC<OnlineManagerProps> = ({
         secretAccessKey: r2SecretAccessKey,
         bucket: r2Bucket,
         accountId: r2AccountId,
+        directory: r2Directory || undefined,
+        contestTitle: normalizedContestTitle,
       };
     } else {
       showToast(t("online:error.not_implemented"), "error");
       return;
     }
 
-    const newSettings: OnlineSyncSettings = {
-      ...settings,
-      config,
-      enabled: true,
-    };
+    if (!config) {
+      showToast(t("online:error.no_config"), "error");
+      return;
+    }
 
-    const cache = readConfigCache();
-    cache[platform] = config;
-    writeConfigCache(cache);
+    // 测试配置是否可用
+    setIsTesting(true);
+    try {
+      const result = await testConnection(config);
+      
+      if (!result.success) {
+        showToast(result.message, "error");
+        setIsTesting(false);
+        return;
+      }
 
-    setSettings(newSettings);
-    localStorage.setItem("onlineSyncSettings", JSON.stringify(newSettings));
-    setShowConfig(false);
-    showToast(t("online:config_saved"), "success");
+      // 配置测试成功，保存
+      const newSettings: OnlineSyncSettings = {
+        ...settings,
+        config,
+        enabled: true,
+      };
+
+      const cache = readConfigCache();
+      cache[platform] = config;
+      writeConfigCache(cache);
+
+      setSettings(newSettings);
+      localStorage.setItem("onlineSyncSettings", JSON.stringify(newSettings));
+      setShowConfig(false);
+      showToast(t("online:config_saved"), "success");
+
+      await uploadWithConfig(config);
+    } catch (error: any) {
+      console.error("Save settings error:", error);
+      showToast(`Error: ${error?.message || "Unknown error"}`, "error");
+    } finally {
+      setIsTesting(false);
+    }
   };
 
   // 测试连接
@@ -264,106 +311,29 @@ const OnlineManager: FC<OnlineManagerProps> = ({
 
     setIsTesting(true);
     try {
-      const success = await testConnection(settings.config);
-      if (success) {
-        showToast(t("online:test_success"), "success");
+      const result = await testConnection(settings.config);
+      
+      if (result.success) {
+        showToast(result.message, "success");
       } else {
-        showToast(t("online:test_failed"), "error");
+        showToast(result.message, "error");
       }
     } catch (error: any) {
       console.error("Test connection error:", error);
-      showToast(t("online:test_failed"), "error");
+      showToast(`Error: ${error?.message || "Unknown error"}`, "error");
     } finally {
       setIsTesting(false);
     }
   };
 
-  // 上传到云�?
-  const handleUpload = async () => {
-    if (!settings.config) {
-      showToast(t("online:error.no_config"), "error");
-      setShowConfig(true);
-      return;
-    }
+  // 上传到云端
+  const getSyncContestTitle = (config?: OnlineSyncConfig | null) =>
+    config?.contestTitle?.trim() || contestData.meta.title;
 
-    try {
-      const exists = await checkOnlineExists(settings.config, contestData.meta.title);
-      if (exists) {
-        const choice = await requestConflictChoice();
-        setShowConflictPrompt(false);
-        conflictResolverRef.current = null;
-
-        if (choice === "cloud") {
-          await handleDownload();
-          return;
-        }
-        if (choice !== "local") {
-          return;
-        }
-      }
-    } catch (error: any) {
-      console.error("Check online exists error:", error);
-      showToast(t("online:upload_failed"), "error");
-      return;
-    }
-
-    setIsUploading(true);
-    try {
-      // 获取所有版本和分支
-      const versions = await getAllVersions();
-      const branches = await getAllBranches();
-
-      // 准备图片 Map
-      const images = new Map<string, Blob>();
-      for (const img of contestData.images) {
-        const response = await fetch(img.url);
-        const blob = await response.blob();
-        images.set(img.uuid, blob);
-      }
-
-      // 上传数据
-      await uploadToOnline(settings.config, contestData.meta.title, {
-        contest: {
-          meta: contestData.meta,
-          problems: contestData.problems.map(({ key, ...rest }) => rest),
-          images: contestData.images.map((img) => ({ uuid: img.uuid, name: img.name })),
-          template: contestData.template,
-        },
-        images,
-        versions,
-        branches,
-      });
-
-      // 更新最后同步时�?
-      const newSettings = {
-        ...settings,
-        lastSyncTime: Date.now(),
-      };
-      setSettings(newSettings);
-      localStorage.setItem("onlineSyncSettings", JSON.stringify(newSettings));
-
-      onSyncComplete?.(newSettings.lastSyncTime);
-
-      showToast(t("online:upload_success"), "success");
-    } catch (error: any) {
-      console.error("Upload error:", error);
-      showToast(t("online:upload_failed"), "error");
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  // 从云端下�?
-  const handleDownload = async () => {
-    if (!settings.config) {
-      showToast(t("online:error.no_config"), "error");
-      setShowConfig(true);
-      return;
-    }
-
+  const downloadWithConfig = async (config: OnlineSyncConfig) => {
     setIsDownloading(true);
     try {
-      const data = await downloadFromOnline(settings.config, contestData.meta.title);
+      const data = await downloadFromOnline(config, getSyncContestTitle(config));
 
       if (!data) {
         showToast(t("online:no_data_found"), "warning");
@@ -400,7 +370,7 @@ const OnlineManager: FC<OnlineManagerProps> = ({
         }
       }
 
-      // 通知父组件刷�?
+      // 通知父组件刷新
       const imageData = Array.from(data.images.entries() as IterableIterator<[string, Blob]>).map(([uuid, blob]) => ({
         uuid,
         name: data.contest.images?.find((img) => img.uuid === uuid)?.name || uuid,
@@ -417,15 +387,22 @@ const OnlineManager: FC<OnlineManagerProps> = ({
         template: data.contest.template,
       });
 
-      // 更新最后同步时�?
-      const newSettings = {
+      // 更新最后同步时间
+      const syncedAt = Date.now();
+      setSettings((prev) => ({
+        ...prev,
+        config,
+        enabled: true,
+        lastSyncTime: syncedAt,
+      }));
+      localStorage.setItem("onlineSyncSettings", JSON.stringify({
         ...settings,
-        lastSyncTime: Date.now(),
-      };
-      setSettings(newSettings);
-      localStorage.setItem("onlineSyncSettings", JSON.stringify(newSettings));
+        config,
+        enabled: true,
+        lastSyncTime: syncedAt,
+      }));
 
-      onSyncComplete?.(newSettings.lastSyncTime);
+      onSyncComplete?.(syncedAt);
 
       showToast(t("online:download_success"), "success");
     } catch (error: any) {
@@ -436,6 +413,104 @@ const OnlineManager: FC<OnlineManagerProps> = ({
     }
   };
 
+  const uploadWithConfig = async (config: OnlineSyncConfig) => {
+    if (isUploading) return;
+
+    try {
+      const exists = await checkOnlineExists(config, getSyncContestTitle(config));
+      if (exists) {
+        const choice = await requestConflictChoice();
+        setShowConflictPrompt(false);
+        conflictResolverRef.current = null;
+
+        if (choice === "cloud") {
+          await downloadWithConfig(config);
+          return;
+        }
+        if (choice !== "local") {
+          return;
+        }
+      }
+    } catch (error: any) {
+      console.error("Check online exists error:", error);
+      showToast(t("online:upload_failed"), "error");
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      // 获取所有版本和分支
+      const versions = await getAllVersions();
+      const branches = await getAllBranches();
+
+      // 准备图片 Map
+      const images = new Map<string, Blob>();
+      for (const img of contestData.images) {
+        const response = await fetch(img.url);
+        const blob = await response.blob();
+        images.set(img.uuid, blob);
+      }
+
+      // 上传数据
+      await uploadToOnline(config, getSyncContestTitle(config), {
+        contest: {
+          meta: contestData.meta,
+          problems: contestData.problems.map(({ key, ...rest }) => rest),
+          images: contestData.images.map((img) => ({ uuid: img.uuid, name: img.name })),
+          template: contestData.template,
+        },
+        images,
+        versions,
+        branches,
+      });
+
+      // 更新最后同步时间
+      const syncedAt = Date.now();
+      setSettings((prev) => ({
+        ...prev,
+        config,
+        enabled: true,
+        lastSyncTime: syncedAt,
+      }));
+      localStorage.setItem("onlineSyncSettings", JSON.stringify({
+        ...settings,
+        config,
+        enabled: true,
+        lastSyncTime: syncedAt,
+      }));
+
+      onSyncComplete?.(syncedAt);
+
+      showToast(t("online:upload_success"), "success");
+    } catch (error: any) {
+      console.error("Upload error:", error);
+      showToast(t("online:upload_failed"), "error");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!settings.config) {
+      showToast(t("online:error.no_config"), "error");
+      setShowConfig(true);
+      return;
+    }
+
+    await uploadWithConfig(settings.config);
+  };
+
+  // 从云端下�?
+  const handleDownload = async () => {
+    if (!settings.config) {
+      showToast(t("online:error.no_config"), "error");
+      setShowConfig(true);
+      return;
+    }
+
+    await downloadWithConfig(settings.config);
+  };
+
   // 切换自动同步
   const toggleAutoSync = () => {
     const newSettings = {
@@ -444,6 +519,19 @@ const OnlineManager: FC<OnlineManagerProps> = ({
     };
     setSettings(newSettings);
     localStorage.setItem("onlineSyncSettings", JSON.stringify(newSettings));
+  };
+
+  // 禁用云同步
+  const disableSync = () => {
+    const newSettings: OnlineSyncSettings = {
+      enabled: false,
+      autoSync: false,
+      config: null,
+      lastSyncTime: undefined,
+    };
+    setSettings(newSettings);
+    localStorage.setItem("onlineSyncSettings", JSON.stringify(newSettings));
+    showToast("云同步已关闭", "success");
   };
 
   if (!isOpen) return null;
@@ -475,6 +563,7 @@ const OnlineManager: FC<OnlineManagerProps> = ({
           <div className="text-sm">
             {settings.enabled && settings.config ? (
               <div className="text-green-600 flex items-center gap-2">
+                <span className="text-gray-600">上次同步信息：</span>
                 <span>{platformName(settings.config.platform)}</span>
                 {settings.lastSyncTime && (
                   <span className="text-gray-400">· {new Date(settings.lastSyncTime).toLocaleDateString()}</span>
@@ -496,17 +585,35 @@ const OnlineManager: FC<OnlineManagerProps> = ({
                 {settings.enabled ? t("online:edit_config") : t("online:configure")}
               </button>
               {settings.enabled && settings.config && (
-                <button
-                  onClick={handleTestConnection}
-                  disabled={isTesting}
-                  className="w-full py-2 px-4 border rounded hover:bg-gray-50 disabled:opacity-50"
-                >
-                  {isTesting ? t("online:testing") : t("online:test_connection")}
-                </button>
+                <>
+                  <button
+                    onClick={handleTestConnection}
+                    disabled={isTesting}
+                    className="w-full py-2 px-4 border rounded hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    {isTesting ? t("online:testing") : t("online:test_connection")}
+                  </button>
+                  <button
+                    onClick={disableSync}
+                    className="w-full py-2 px-4 border border-red-300 text-red-600 rounded hover:bg-red-50"
+                  >
+                    禁用云同步
+                  </button>
+                </>
               )}
             </div>
           ) : (
             <div className="space-y-3">
+              <div>
+                <label className="block text-sm text-gray-600 mb-2">比赛标题（用于同步）</label>
+                <input
+                  type="text"
+                  placeholder="默认使用当前比赛标题"
+                  value={contestTitle}
+                  onChange={(e) => setContestTitle(e.target.value)}
+                  className="w-full px-3 py-2 border rounded text-sm"
+                />
+              </div>
               <div>
                 <label className="block text-sm text-gray-600 mb-2">{t("online:select_platform")}</label>
                 <div className="grid grid-cols-2 gap-2">
@@ -532,6 +639,7 @@ const OnlineManager: FC<OnlineManagerProps> = ({
                   <input type="password" placeholder="Secret Key" value={cosSecretKey} onChange={(e) => setCosSecretKey(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
                   <input type="text" placeholder="Bucket" value={cosBucket} onChange={(e) => setCosBucket(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
                   <input type="text" placeholder="Region (如 ap-guangzhou)" value={cosRegion} onChange={(e) => setCosRegion(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
+                  <input type="text" placeholder="Directory (可选, 如 contests, 不填默认根目录)" value={cosDirectory} onChange={(e) => setCosDirectory(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
                 </div>
               )}
 
@@ -542,6 +650,7 @@ const OnlineManager: FC<OnlineManagerProps> = ({
                   <input type="password" placeholder="Access Key Secret" value={ossAccessKeySecret} onChange={(e) => setOssAccessKeySecret(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
                   <input type="text" placeholder="Bucket" value={ossBucket} onChange={(e) => setOssBucket(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
                   <input type="text" placeholder="Region (如 oss-cn-hangzhou)" value={ossRegion} onChange={(e) => setOssRegion(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
+                  <input type="text" placeholder="Directory (可选, 如 contests, 不填默认根目录)" value={ossDirectory} onChange={(e) => setOssDirectory(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
                 </div>
               )}
 
@@ -550,7 +659,7 @@ const OnlineManager: FC<OnlineManagerProps> = ({
                 <div className="space-y-2">
                   <input type="password" placeholder="Personal Access Token" value={githubToken} onChange={(e) => setGithubToken(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
                   <input type="text" placeholder="Repository (owner/repo)" value={githubRepo} onChange={(e) => setGithubRepo(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
-                  <input type="text" placeholder="Directory (可选, 如 my-contests)" value={githubDirectory} onChange={(e) => setGithubDirectory(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
+                  <input type="text" placeholder="Directory (可选, 如 contests, 不填默认根目录)" value={githubDirectory} onChange={(e) => setGithubDirectory(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
                 </div>
               )}
 
@@ -561,14 +670,15 @@ const OnlineManager: FC<OnlineManagerProps> = ({
                   <input type="password" placeholder="Secret Access Key" value={r2SecretAccessKey} onChange={(e) => setR2SecretAccessKey(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
                   <input type="text" placeholder="Bucket" value={r2Bucket} onChange={(e) => setR2Bucket(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
                   <input type="text" placeholder="Account ID" value={r2AccountId} onChange={(e) => setR2AccountId(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
+                  <input type="text" placeholder="Directory (可选, 如 contests, 不填默认根目录)" value={r2Directory} onChange={(e) => setR2Directory(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
                 </div>
               )}
 
               <div className="flex gap-2">
-                <button onClick={saveSettings} className="flex-1 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
-                  {t("online:save_config")}
+                <button onClick={() => saveSettings()} disabled={isTesting} className="flex-1 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 text-sm">
+                  {isTesting ? `${t("online:testing")}...` : t("online:save_config")}
                 </button>
-                <button onClick={() => setShowConfig(false)} className="flex-1 py-2 border rounded hover:bg-gray-50 text-sm">
+                <button onClick={() => setShowConfig(false)} disabled={isTesting} className="flex-1 py-2 border rounded hover:bg-gray-50 disabled:bg-gray-100 text-sm">
                   {t("common:cancel")}
                 </button>
               </div>
@@ -576,7 +686,7 @@ const OnlineManager: FC<OnlineManagerProps> = ({
           )}
 
           {/* 自动同步 */}
-          {settings.enabled && settings.config && (
+          {!showConfig && settings.enabled && settings.config && (
             <div className="flex items-center justify-between py-2 border-t">
               <span className="text-sm">{t("online:auto_sync")}</span>
               <input type="checkbox" checked={settings.autoSync} onChange={toggleAutoSync} className="toggle toggle-sm" />
@@ -584,7 +694,7 @@ const OnlineManager: FC<OnlineManagerProps> = ({
           )}
 
           {/* 同步操作按钮 */}
-          {settings.enabled && settings.config && (
+          {!showConfig && settings.enabled && settings.config && (
             <div className="flex gap-2 pt-2 border-t">
               <button
                 onClick={handleUpload}

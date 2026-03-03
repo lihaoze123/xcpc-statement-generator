@@ -47,6 +47,7 @@
     output: "输出格式",
     examples: "样例",
     note: "提示",
+    limits: "题目限制",
     problem-list: "试题列表",
     stdin: "standard input",
     stdout: "standard output",
@@ -58,6 +59,7 @@
     output: "Output",
     examples: "Examples",
     note: "Note",
+    limits: "Limits",
     problem-list: "Problem List",
     stdin: "standard input",
     stdout: "standard output",
@@ -69,6 +71,17 @@
 #let render-problem(problem, statement, language: "zh") = [
   #text(font: fonts.sans, size: 20.74pt, weight: "bold")[#problem.display-name]
   #v(3mm)
+
+  #if problem.at("limits", default: none) != none and problem.limits.len() > 0 [
+    #set text(size: 11pt)
+    #table(
+      columns: (4.2cm, 9.8cm),
+      align: (left, left),
+      stroke: none,
+      ..problem.limits.map(l => (strong(l.key + ":"), l.value)).flatten(),
+    )
+    #v(0.6em)
+  ]
 
   #let format = problem.at("format", default: "latex")
   #if format == "latex" {

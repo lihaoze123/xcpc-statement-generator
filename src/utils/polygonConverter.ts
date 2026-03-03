@@ -372,6 +372,7 @@ export class PolygonContestConverter {
         display_name: problemId,
         format: 'latex',
         samples: [],
+        limits: [],
       },
       statement: {
         description: 'Problem description not available',
