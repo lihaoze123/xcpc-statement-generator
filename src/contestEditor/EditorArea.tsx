@@ -392,7 +392,7 @@ const SingleProblemEditor: FC<{
       <TabBar activeTab={activeTab} onTabChange={setActiveTab} />
 
       {/* Editor Content */}
-      <div className="flex-1 overflow-hidden p-4">
+      <div className="flex-1 min-h-0 overflow-y-auto custom-scroll p-4">
         {renderEditor()}
       </div>
     </div>
