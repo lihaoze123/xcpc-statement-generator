@@ -17,20 +17,7 @@
 
 .preview {
   width: 100%;
-  height: 100%;
   position: relative;
-  background: var(--color-base-200, #F5EFE9);
-}
-
-.preview-container {
-  overflow: auto;
-  height: 100%;
-  transform: translateZ(0);
-}
-
-.preview-container > div {
-  padding: 16px;
-  background: white;
 }
 
 /* Toolbar layout and compact controls */

@@ -1,14 +1,21 @@
 import {
-  memo,
   forwardRef,
+  memo,
   useCallback,
   useEffect,
   useImperativeHandle,
   useRef,
   useState,
+  type RefObject,
 } from "react";
 import type { ContestWithImages } from "@/types/contest";
-import { compileToSvgDebounced, typstInitPromise } from "@/compiler";
+import {
+  compilePreviewDebounced,
+  renderPreviewPage,
+  typstInitPromise,
+  type PreviewDocumentUpdate,
+  type TypstPreviewPage,
+} from "@/compiler";
 
 export type PreviewPageInfo = {
   currentPage: number;
@@ -16,299 +23,298 @@ export type PreviewPageInfo = {
 };
 
 export type PreviewHandle = {
-  jumpToPage: (page: number) => boolean;
+  jumpToPage: (page: number, behavior?: ScrollBehavior) => boolean;
   getCurrentPage: () => number;
   getPageCount: () => number;
 };
 
-const TypstPreviewContainer = memo<{ svg: string; onRendered?: (host: HTMLDivElement) => void }>(({ svg, onRendered }) => {
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const host = ref.current;
-    if (!host || host.shadowRoot) return;
-    host.attachShadow({ mode: "open" });
-  }, []);
-
-  useEffect(() => {
-    if (!ref.current?.shadowRoot) return;
-    ref.current.shadowRoot.innerHTML = `
-      ${svg}
-      <style>
-        .typst-doc { width: 100%; height: auto; }
-      </style>
-    `;
-    onRendered?.(ref.current);
-  }, [onRendered, svg]);
-
-  return <div ref={ref} />;
-});
-
-const isScrollable = (element: HTMLElement) => {
-  const style = window.getComputedStyle(element);
-  const overflowY = style.overflowY;
-  const canScrollByStyle = overflowY === "auto" || overflowY === "scroll" || overflowY === "overlay";
-  return canScrollByStyle && element.scrollHeight > element.clientHeight + 1;
+type PreviewProps = {
+  data: ContestWithImages;
+  zoom: number;
+  scrollRootRef: RefObject<HTMLDivElement | null>;
+  onPageInfoChange?: (info: PreviewPageInfo) => void;
 };
 
-const findScrollableContainer = (start: HTMLElement | null): HTMLElement | null => {
-  let node = start;
-  while (node) {
-    if (isScrollable(node)) return node;
-    node = node.parentElement;
-  }
-  return start;
-};
-
-const collectPageNodes = (shadowRoot: ShadowRoot): Element[] => {
-  const directPages = Array.from(shadowRoot.children).filter((el) => {
-    if (el.tagName.toLowerCase() === "style") return false;
-    if (el.classList.contains("typst-page")) return true;
-    if (el.hasAttribute("data-page") || el.hasAttribute("data-page-number")) return true;
-    return el.tagName.toLowerCase() === "svg";
-  });
-  if (directPages.length > 1) return directPages;
-
-  const selectors = [
-    ".typst-page",
-    ".typst-dom-page",
-    "[data-page-number]",
-    "[data-page]",
-    "svg.typst-doc > g.typst-page",
-    "svg.typst-doc > g[data-page-number]",
-    "svg.typst-doc > g[data-page]",
-  ];
-
-  for (const selector of selectors) {
-    const nodes = Array.from(shadowRoot.querySelectorAll(selector));
-    if (nodes.length > 0) return nodes;
-  }
-
-  const fallbackSvg = Array.from(shadowRoot.querySelectorAll("svg"));
-  if (fallbackSvg.length > 0) return fallbackSvg;
-
-  return [];
+type PreviewPageProps = {
+  index: number;
+  page: TypstPreviewPage;
+  revision: number;
+  zoom: number;
+  shouldRender: boolean;
+  onPageNode: (index: number, node: HTMLDivElement | null) => void;
+  onRenderError: (reason: unknown) => void;
 };
 
 const clampPage = (page: number, total: number) => {
   if (!Number.isFinite(page)) return 1;
-  const normalized = Math.trunc(page);
-  return Math.min(Math.max(1, normalized), Math.max(1, total));
+  return Math.min(Math.max(1, Math.trunc(page)), Math.max(1, total));
 };
 
-type PreviewProps = {
-  data: ContestWithImages;
-  onPageInfoChange?: (info: PreviewPageInfo) => void;
+const samePageSet = (left: Set<number>, right: Set<number>) => {
+  if (left.size !== right.size) return false;
+  for (const page of left) {
+    if (!right.has(page)) return false;
+  }
+  return true;
 };
 
-const Preview = forwardRef<PreviewHandle, PreviewProps>(({ data, onPageInfoChange }, ref) => {
-  const [error, setError] = useState<string>();
-  const [svg, setSvg] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const previewContainerRef = useRef<HTMLDivElement>(null);
-  const scrollContainerRef = useRef<HTMLElement | null>(null);
-  const pageNodesRef = useRef<Element[]>([]);
-  const pageInfoRef = useRef<PreviewPageInfo>({ currentPage: 1, totalPages: 1 });
-  const pendingJumpRef = useRef<number | null>(null);
+const PreviewPage = memo(({
+  index,
+  page,
+  revision,
+  zoom,
+  shouldRender,
+  onPageNode,
+  onRenderError,
+}: PreviewPageProps) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [renderedRevision, setRenderedRevision] = useState(-1);
 
-  const resolveScrollContainer = useCallback(() => {
-    const container = findScrollableContainer(previewContainerRef.current);
-    scrollContainerRef.current = container;
-    return container;
-  }, []);
-
-  const updatePageInfo = useCallback(() => {
-    const container = scrollContainerRef.current ?? resolveScrollContainer();
-    const pages = pageNodesRef.current;
-    const totalPages = Math.max(1, pages.length);
-
-    if (!container || pages.length === 0) {
-      const fallbackInfo = { currentPage: 1, totalPages };
-      const previous = pageInfoRef.current;
-      if (
-        previous.currentPage !== fallbackInfo.currentPage ||
-        previous.totalPages !== fallbackInfo.totalPages
-      ) {
-        pageInfoRef.current = fallbackInfo;
-        onPageInfoChange?.(fallbackInfo);
-      }
-      return fallbackInfo;
-    }
-
-    const containerRect = container.getBoundingClientRect();
-    const viewportAnchor = containerRect.top + Math.max(16, container.clientHeight * 0.25);
-    let currentPage = 1;
-
-    for (let i = 0; i < pages.length; i += 1) {
-      const rect = pages[i].getBoundingClientRect();
-      if (rect.top <= viewportAnchor) currentPage = i + 1;
-      if (rect.top > viewportAnchor) break;
-    }
-
-    const nextInfo = { currentPage, totalPages };
-    const previous = pageInfoRef.current;
-    if (previous.currentPage !== nextInfo.currentPage || previous.totalPages !== nextInfo.totalPages) {
-      pageInfoRef.current = nextInfo;
-      onPageInfoChange?.(nextInfo);
-    }
-
-    return nextInfo;
-  }, [onPageInfoChange, resolveScrollContainer]);
-
-  const jumpToPageInternal = useCallback((page: number, behavior: ScrollBehavior) => {
-    const container = scrollContainerRef.current ?? resolveScrollContainer();
-    if (!container) return false;
-
-    const pages = pageNodesRef.current;
-    const totalPages = Math.max(1, pages.length);
-    const targetPage = clampPage(page, totalPages);
-
-    if (pages.length === 0) {
-      pendingJumpRef.current = targetPage;
-      return false;
-    }
-
-    const targetNode = pages[targetPage - 1] ?? pages[pages.length - 1];
-    const containerRect = container.getBoundingClientRect();
-    const targetRect = targetNode.getBoundingClientRect();
-    const rawTop = container.scrollTop + (targetRect.top - containerRect.top);
-    const maxTop = Math.max(0, container.scrollHeight - container.clientHeight);
-    const targetTop = Math.min(Math.max(0, rawTop), maxTop);
-
-    container.scrollTo({ top: targetTop, behavior });
-    requestAnimationFrame(() => updatePageInfo());
-    return true;
-  }, [resolveScrollContainer, updatePageInfo]);
-
-  useImperativeHandle(ref, () => ({
-    jumpToPage: (page: number) => jumpToPageInternal(page, "smooth"),
-    getCurrentPage: () => pageInfoRef.current.currentPage,
-    getPageCount: () => pageInfoRef.current.totalPages,
-  }), [jumpToPageInternal]);
+  const registerPageNode = useCallback((node: HTMLDivElement | null) => {
+    onPageNode(index, node);
+  }, [index, onPageNode]);
 
   useEffect(() => {
-    let mounted = true;
-    setLoading(true);
+    const canvas = canvasRef.current;
+    if (!shouldRender) {
+      setRenderedRevision(-1);
+      return;
+    }
+    if (!canvas) return;
 
-    typstInitPromise
-      .then(() => compileToSvgDebounced(data))
-      .then((result) => {
-        if (!mounted) return;
-        if (result) {
-          setSvg(result);
-          setError(undefined);
-        } else {
-          setError("编译返回空结果");
-        }
-        setLoading(false);
+    let active = true;
+    renderPreviewPage(index, canvas)
+      .then(() => {
+        if (active) setRenderedRevision(revision);
       })
-      .catch((e) => {
-        if (!mounted) return;
-        if (String(e) === "Aborted") return;
-        setError(e instanceof Error ? e.message : String(e));
-        setLoading(false);
+      .catch((reason) => {
+        if (active) onRenderError(reason);
       });
 
-    return () => { mounted = false; };
-  }, [data]);
-
-  // Show loading overlay over existing SVG instead of clearing it
-  const showLoadingOverlay = loading && svg;
-
-  const handleSvgRendered = useCallback((host: HTMLDivElement) => {
-    const root = host.shadowRoot;
-    if (!root) return;
-
-    pageNodesRef.current = collectPageNodes(root);
-    resolveScrollContainer();
-    updatePageInfo();
-
-    const pendingPage = pendingJumpRef.current;
-    if (pendingPage !== null) {
-      pendingJumpRef.current = null;
-      jumpToPageInternal(pendingPage, "auto");
-    }
-  }, [jumpToPageInternal, resolveScrollContainer, updatePageInfo]);
-
-  useEffect(() => {
-    const container = resolveScrollContainer();
-    if (!container) return;
-
-    let scrollRatio = 0;
-    let preventScroll = false;
-
-    const updateRatio = () => {
-      const scrollableHeight = Math.max(1, container.scrollHeight - container.clientHeight);
-      scrollRatio = container.scrollTop / scrollableHeight;
-    };
-
-    const handleScroll = () => {
-      if (preventScroll) {
-        preventScroll = false;
-      } else {
-        updateRatio();
-      }
-      updatePageInfo();
-    };
-
-    const handleResize = () => {
-      const scrollableHeight = Math.max(0, container.scrollHeight - container.clientHeight);
-      const scrollTop = scrollRatio * scrollableHeight;
-      if (Math.abs(scrollTop - container.scrollTop) > 1) {
-        preventScroll = true;
-        container.scrollTop = scrollTop;
-      }
-      updatePageInfo();
-    };
-
-    updateRatio();
-    updatePageInfo();
-
-    container.addEventListener("scroll", handleScroll, { passive: true });
-    const observer = new ResizeObserver(handleResize);
-    observer.observe(container);
-    if (previewContainerRef.current && previewContainerRef.current !== container) {
-      observer.observe(previewContainerRef.current);
-    }
-
     return () => {
-      container.removeEventListener("scroll", handleScroll);
-      observer.disconnect();
+      active = false;
     };
-  }, [resolveScrollContainer, svg, updatePageInfo]);
+  }, [index, onRenderError, revision, shouldRender, zoom]);
 
   return (
-    <div className="preview">
+    <div
+      ref={registerPageNode}
+      className="preview-page relative w-full shrink-0 overflow-hidden bg-white shadow-sm ring-1 ring-black/5"
+      data-page={index + 1}
+      data-page-offset={page.pageOffset}
+      style={{ aspectRatio: `${page.width} / ${page.height}` }}
+    >
+      {shouldRender && (
+        <canvas
+          ref={canvasRef}
+          className="absolute inset-0 block h-full w-full"
+          aria-label={`Preview page ${index + 1}`}
+        />
+      )}
+      {shouldRender && renderedRevision !== revision && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60">
+          <span className="loading loading-spinner loading-md" />
+        </div>
+      )}
+    </div>
+  );
+});
+
+PreviewPage.displayName = "PreviewPage";
+
+const Preview = forwardRef<PreviewHandle, PreviewProps>(({
+  data,
+  zoom,
+  scrollRootRef,
+  onPageInfoChange,
+}, ref) => {
+  const [document, setDocument] = useState<PreviewDocumentUpdate>();
+  const [currentPage, setCurrentPage] = useState(1);
+  const [renderablePages, setRenderablePages] = useState<Set<number>>(() => new Set([0]));
+  const [error, setError] = useState<string>();
+  const [compiling, setCompiling] = useState(true);
+  const pageNodesRef = useRef(new Map<number, HTMLDivElement>());
+  const pageInfoRef = useRef<PreviewPageInfo>({ currentPage: 1, totalPages: 1 });
+
+  const publishPageInfo = useCallback((page: number, total: number) => {
+    const next = {
+      currentPage: clampPage(page, total),
+      totalPages: Math.max(1, total),
+    };
+    const previous = pageInfoRef.current;
+    if (previous.currentPage === next.currentPage && previous.totalPages === next.totalPages) return;
+    pageInfoRef.current = next;
+    onPageInfoChange?.(next);
+  }, [onPageInfoChange]);
+
+  const registerPageNode = useCallback((index: number, node: HTMLDivElement | null) => {
+    if (node) pageNodesRef.current.set(index, node);
+    else pageNodesRef.current.delete(index);
+  }, []);
+
+  const jumpToPage = useCallback((page: number, behavior: ScrollBehavior = "smooth") => {
+    const total = document?.pages.length ?? 0;
+    const scrollRoot = scrollRootRef.current;
+    if (total === 0 || !scrollRoot) return false;
+
+    const targetPage = clampPage(page, total);
+    const targetNode = pageNodesRef.current.get(targetPage - 1);
+    if (!targetNode) return false;
+
+    const rootRect = scrollRoot.getBoundingClientRect();
+    const targetRect = targetNode.getBoundingClientRect();
+    scrollRoot.scrollTo({
+      top: scrollRoot.scrollTop + targetRect.top - rootRect.top - 24,
+      behavior,
+    });
+    return true;
+  }, [document?.pages.length, scrollRootRef]);
+
+  useImperativeHandle(ref, () => ({
+    jumpToPage,
+    getCurrentPage: () => pageInfoRef.current.currentPage,
+    getPageCount: () => pageInfoRef.current.totalPages,
+  }), [jumpToPage]);
+
+  useEffect(() => {
+    let active = true;
+    setCompiling(true);
+
+    typstInitPromise
+      .then(() => compilePreviewDebounced(data))
+      .then((update) => {
+        if (!active) return;
+        setDocument(update);
+        setError(undefined);
+        setCompiling(false);
+      })
+      .catch((reason) => {
+        if (!active || String(reason) === "Aborted") return;
+        setError(reason instanceof Error ? reason.message : String(reason));
+        setCompiling(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [data]);
+
+  useEffect(() => {
+    publishPageInfo(currentPage, document?.pages.length ?? 0);
+  }, [currentPage, document?.pages.length, publishPageInfo]);
+
+  useEffect(() => {
+    if (!document?.pages.length) return;
+
+    const scrollRoot = scrollRootRef.current;
+    const visiblePages = new Set<number>();
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        const pageIndex = Number((entry.target as HTMLElement).dataset.pageIndex);
+        if (entry.isIntersecting) visiblePages.add(pageIndex);
+        else visiblePages.delete(pageIndex);
+      }
+
+      const next = new Set(visiblePages);
+      if (next.size === 0) next.add(clampPage(pageInfoRef.current.currentPage, document.pages.length) - 1);
+      setRenderablePages((previous) => samePageSet(previous, next) ? previous : next);
+    }, {
+      root: scrollRoot,
+      rootMargin: "35% 0px",
+      threshold: 0,
+    });
+
+    for (const [index, node] of pageNodesRef.current) {
+      node.dataset.pageIndex = String(index);
+      observer.observe(node);
+    }
+
+    return () => observer.disconnect();
+  }, [document, scrollRootRef]);
+
+  useEffect(() => {
+    if (!document?.pages.length) return;
+
+    const scrollRoot = scrollRootRef.current;
+    if (!scrollRoot) return;
+    let animationFrame = 0;
+
+    const updateCurrentPage = () => {
+      animationFrame = 0;
+      const rootRect = scrollRoot.getBoundingClientRect();
+      const anchor = rootRect.top + Math.min(rootRect.height * 0.35, 240);
+      let closestPage = 0;
+      let closestDistance = Number.POSITIVE_INFINITY;
+
+      for (const [index, node] of pageNodesRef.current) {
+        const pageRect = node.getBoundingClientRect();
+        const distance = pageRect.top <= anchor && pageRect.bottom >= anchor
+          ? 0
+          : Math.min(Math.abs(pageRect.top - anchor), Math.abs(pageRect.bottom - anchor));
+        if (distance < closestDistance) {
+          closestDistance = distance;
+          closestPage = index;
+        }
+      }
+
+      setCurrentPage((previous) => previous === closestPage + 1 ? previous : closestPage + 1);
+    };
+
+    const scheduleUpdate = () => {
+      if (!animationFrame) animationFrame = requestAnimationFrame(updateCurrentPage);
+    };
+
+    scrollRoot.addEventListener("scroll", scheduleUpdate, { passive: true });
+    window.addEventListener("resize", scheduleUpdate);
+    scheduleUpdate();
+
+    return () => {
+      scrollRoot.removeEventListener("scroll", scheduleUpdate);
+      window.removeEventListener("resize", scheduleUpdate);
+      if (animationFrame) cancelAnimationFrame(animationFrame);
+    };
+  }, [document, scrollRootRef]);
+
+  const handleRenderError = useCallback((reason: unknown) => {
+    setError(reason instanceof Error ? reason.message : String(reason));
+  }, []);
+
+  return (
+    <div className="preview relative flex w-full flex-col gap-6 pb-2">
       {error && (
-        <div className="alert alert-error m-4 absolute top-0 left-0 right-0 z-10">
-          <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+        <div className="alert alert-error sticky top-2 z-20 mx-2">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 shrink-0 stroke-current" fill="none" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           <div>
             <div className="font-bold">渲染出错</div>
-            <div className="text-xs">{error}</div>
+            <div className="whitespace-pre-wrap text-xs">{error}</div>
           </div>
         </div>
       )}
-      {/* Initial loading state - show spinner only when no SVG */}
-      {loading && !svg && (
-        <div className="flex justify-center items-center h-full min-h-[200px]">
-          <span className="loading loading-spinner loading-lg"></span>
+
+      {!document?.pages.length && compiling && (
+        <div
+          className="flex items-center justify-center bg-white shadow-sm"
+          style={{ aspectRatio: "210 / 297" }}
+        >
+          <span className="loading loading-spinner loading-lg" />
           <span className="ml-2">正在编译...</span>
         </div>
       )}
-      {/* Show SVG with loading overlay - no flickering */}
-      {svg && (
-        <div className="preview-container relative" ref={previewContainerRef}>
-          <TypstPreviewContainer svg={svg} onRendered={handleSvgRendered} />
-          {showLoadingOverlay && (
-            <div className="absolute inset-0 bg-white/50 flex items-center justify-center">
-              <span className="loading loading-spinner loading-md"></span>
-              <span className="ml-2 text-sm">正在重新编译...</span>
-            </div>
-          )}
-        </div>
-      )}
+
+      {document?.pages.map((page, index) => (
+        <PreviewPage
+          key={page.pageOffset}
+          index={index}
+          page={page}
+          revision={document.revision}
+          zoom={zoom}
+          shouldRender={renderablePages.has(index)}
+          onPageNode={registerPageNode}
+          onRenderError={handleRenderError}
+        />
+      ))}
     </div>
   );
 });

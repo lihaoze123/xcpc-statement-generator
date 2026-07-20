@@ -28,6 +28,10 @@
   "downloadFont": "Download Font",
   "requestFontAccess": "Request Access to Local Fonts",
   "fontAccessDescription": "Allowing access to local fonts can reduce download size.",
+  "downloadEnhancedFontsTitle": "Download FangZheng fonts for better rendering?",
+  "downloadEnhancedFontsDescription": "Download the approximately 48 MB FangZheng font pack for typesetting closer to the original template. Otherwise, locally installed Windows, Noto, or Source Han fonts will be used and preview will continue normally. This choice will be remembered.",
+  "downloadEnhancedFonts": "Download fonts (~48 MB)",
+  "useFallbackFonts": "Use fallback fonts",
   "initializingTypst": "Initializing Typst compiler...",
   "downloadingCompiler": "Downloading compiler and fonts",
   "versionControl": {
