@@ -122,57 +122,91 @@ const createGitHubAdapter = (config: OnlineSyncConfig): StorageAdapter => {
   const [owner, repo] = config.repo.split("/");
 
   // 待提交的缓存
-  const pendingFiles = new Map<string, { content: string; isBlob: boolean }>();
+  const pendingFiles = new Map<string, { content: string; isBase64: boolean }>();
 
-  // 提交所有缓存的文件（单次 commit）
-  const commitAll = async (message: string) => {
+  // 检查仓库是否为空
+  const isRepositoryEmpty = async (): Promise<boolean> => {
+    try {
+      await octokit.git.getRef({ owner, repo, ref: "heads/main" });
+      return false;
+    } catch (err: any) {
+      const status = err?.status;
+      const message = err?.message || "";
+      
+      if (status === 404 || status === 409 || status === 422 || message.includes("Reference not found") || message.includes("Git Repository is empty")) {
+        return true;
+      }
+      throw err;
+    }
+  };
+
+  // 初始化仓库（如果为空）- 使用 Contents API 而不是 Git API
+  const initializeRepository = async () => {
+    try {
+      // 直接用 Contents API 创建 README.md 初始化仓库
+      await octokit.repos.createOrUpdateFileContents({
+        owner,
+        repo,
+        path: "README.md",
+        message: "Initial commit: Initialize repository",
+        content: base64FromString("# XCPC Contests\n\nThis repository stores XCPC contest data.\n"),
+      });
+      console.log("✓ Repository initialized");
+    } catch (error: any) {
+      console.error("Failed to initialize repository:", error);
+      throw error;
+    }
+  };
+
+  // 提交所有缓存的文件（使用 Contents API）
+  const commitAll = async (_message: string) => {
     if (pendingFiles.size === 0) return;
 
-    const entries = Array.from(pendingFiles.entries());
-    // 先创建所有 blobs
-    const blobResults = await Promise.all(
-      entries.map(async ([path, value]) => {
-        const res = await octokit.git.createBlob({ owner, repo, content: value.content, encoding: "base64" });
-        return { path, sha: res.data.sha };
-      })
-    );
+    try {
+      // 检查是否需要初始化
+      const isEmpty = await isRepositoryEmpty();
+      if (isEmpty) {
+        console.log("Repository is empty, initializing...");
+        await initializeRepository();
+      }
 
-    // 构建 tree
-    const treeItems = blobResults.map((r) => ({
-      path: r.path,
-      mode: "100644" as const,
-      type: "blob" as const,
-      sha: r.sha,
-    }));
+      // 使用 Contents API 逐个上传文件
+      for (const [path, value] of pendingFiles) {
+        try {
+          // 检查文件是否存在
+          let sha: string | undefined;
+          try {
+            const existing = await octokit.repos.getContent({ owner, repo, path });
+            sha = (existing.data as any).sha;
+          } catch (e: any) {
+            // 文件不存在，sha 保持 undefined
+            if (e?.status !== 404) {
+              throw e;
+            }
+          }
 
-    // 获取当前 commit 的 sha
-    const { data: ref } = await octokit.git.getRef({ owner, repo, ref: "heads/main" });
-    const currentCommitSha = ref.object.sha;
+          // 创建或更新文件
+          await octokit.repos.createOrUpdateFileContents({
+            owner,
+            repo,
+            path,
+            message: `Update ${path}`,
+            content: value.content,
+            sha,
+          });
+          
+          console.log(`✓ Uploaded: ${path}`);
+        } catch (error: any) {
+          console.error(`Failed to upload file ${path}:`, error);
+          throw error;
+        }
+      }
 
-    // 创建新 tree
-    const { data: newTree } = await octokit.git.createTree({
-      owner, repo,
-      tree: treeItems,
-      base_tree: currentCommitSha,
-    });
-
-    // 创建 commit
-    const { data: newCommit } = await octokit.git.createCommit({
-      owner, repo,
-      message,
-      tree: newTree.sha,
-      parents: [currentCommitSha],
-      committer: { name: "xcpc-statement-generator", email: "xcpc@generator.local" },
-    });
-
-    // 更新 main 分支引用
-    await octokit.git.updateRef({
-      owner, repo,
-      ref: "heads/main",
-      sha: newCommit.sha,
-    });
-
-    pendingFiles.clear();
+      pendingFiles.clear();
+    } catch (error) {
+      console.error("Commit failed:", error);
+      throw error;
+    }
   };
 
   return {
@@ -180,18 +214,26 @@ const createGitHubAdapter = (config: OnlineSyncConfig): StorageAdapter => {
       const base64Content = typeof content === 'string' ? base64FromString(content)
         : content instanceof Blob ? base64FromBytes(new Uint8Array(await content.arrayBuffer()))
         : base64FromBytes(content);
-      pendingFiles.set(path, { content: base64Content, isBlob: false });
+      pendingFiles.set(path, { content: base64Content, isBase64: true });
     },
     async getFile(path) {
-      const response = await octokit.repos.getContent({ owner, repo, path });
-      return bytesFromBase64((response.data as any).content);
+      try {
+        const response = await octokit.repos.getContent({ owner, repo, path });
+        return bytesFromBase64((response.data as any).content);
+      } catch (error: any) {
+        if (error?.status === 404) {
+          throw new Error(`File not found: ${path}`);
+        }
+        throw error;
+      }
     },
     async headFile(path) {
       try {
         await octokit.repos.getContent({ owner, repo, path });
         return true;
       } catch (err: any) {
-        return err?.status !== 404 ? ((): never => { throw err; })() : false;
+        if (err?.status === 404) return false;
+        throw err;
       }
     },
     async commit(message = "Update files") {
@@ -402,16 +444,134 @@ export const downloadFromOnline = async (
 };
 
 /**
- * 测试连接
+ * 测试连接 - 真实检验上传权限
  */
-export const testConnection = async (config: OnlineSyncConfig): Promise<boolean> => {
+export const testConnection = async (config: OnlineSyncConfig): Promise<{ success: boolean; message: string }> => {
   try {
-    const adapter = createStorageAdapter(config);
-    // 尝试执行一个轻量级操作来测试连接
-    await adapter.headFile('test-connection-probe');
-    return true;
-  } catch (error) {
-    console.error("Connection test failed:", error);
-    return false;
+    switch (config.platform) {
+      case "github": {
+        const octokit = new Octokit({ auth: config.token });
+        const [owner, repo] = config.repo.split("/");
+        
+        try {
+          // 验证 token 有效性和仓库访问权限
+          const repoInfo = await octokit.repos.get({ owner, repo });
+          
+          // 检查是否有写入权限
+          if (!repoInfo.data.permissions?.push) {
+            return { 
+              success: false, 
+              message: "No write permission to repository. Please check your token permissions." 
+            };
+          }
+          
+          return { 
+            success: true, 
+            message: `✓ GitHub connected: ${repoInfo.data.full_name}` 
+          };
+        } catch (error: any) {
+          if (error?.status === 401) {
+            return { success: false, message: "GitHub token invalid or expired" };
+          } else if (error?.status === 404) {
+            return { success: false, message: `GitHub repository not found: ${config.repo}` };
+          } else if (error?.status === 403) {
+            return { success: false, message: "Access denied. Check token permissions." };
+          }
+          throw error;
+        }
+      }
+
+      case "cos": {
+        const adapter = createCOSAdapter(config);
+        try {
+          // 尝试上传一个测试文件
+          const testPath = `.xcpc-test-${Date.now()}.txt`;
+          await adapter.putFile(testPath, "test");
+          
+          // 验证文件确实上传了
+          const exists = await adapter.headFile(testPath);
+          if (!exists) {
+            return { success: false, message: "File uploaded but verification failed" };
+          }
+          
+          return { success: true, message: "✓ COS connected and write permission verified" };
+        } catch (error: any) {
+          const status = error?.statusCode;
+          const code = error?.error?.Code || error?.error?.code;
+          
+          if (status === 403 || code === "AccessDenied") {
+            return { success: false, message: "COS: Access denied. Check SecretId and SecretKey" };
+          } else if (code === "InvalidBucketName") {
+            return { success: false, message: "COS: Invalid bucket name" };
+          } else if (code === "NoSuchBucket") {
+            return { success: false, message: "COS: Bucket does not exist" };
+          }
+          throw error;
+        }
+      }
+
+      case "oss": {
+        const adapter = createOSSAdapter(config);
+        try {
+          // 尝试上传一个测试文件
+          const testPath = `.xcpc-test-${Date.now()}.txt`;
+          await adapter.putFile(testPath, "test");
+          
+          // 验证文件确实上传了
+          const exists = await adapter.headFile(testPath);
+          if (!exists) {
+            return { success: false, message: "File uploaded but verification failed" };
+          }
+          
+          return { success: true, message: "✓ OSS connected and write permission verified" };
+        } catch (error: any) {
+          if (error?.status === 403 || error?.code === "AccessDenied") {
+            return { success: false, message: "OSS: Access denied. Check AccessKeyId and AccessKeySecret" };
+          } else if (error?.code === "NoSuchBucket") {
+            return { success: false, message: "OSS: Bucket does not exist" };
+          } else if (error?.message?.includes("403")) {
+            return { success: false, message: "OSS: Permission denied. Check bucket access policy" };
+          }
+          throw error;
+        }
+      }
+
+      case "r2": {
+        const adapter = createR2Adapter(config);
+        try {
+          // 尝试上传一个测试文件
+          const testPath = `.xcpc-test-${Date.now()}.txt`;
+          await adapter.putFile(testPath, "test");
+          
+          // 验证文件确实上传了
+          const exists = await adapter.headFile(testPath);
+          if (!exists) {
+            return { success: false, message: "File uploaded but verification failed" };
+          }
+          
+          return { success: true, message: "✓ Cloudflare R2 connected and write permission verified" };
+        } catch (error: any) {
+          if (error?.name === "InvalidAccessKeyId" || error?.Code === "InvalidAccessKeyId") {
+            return { success: false, message: "R2: Invalid AccessKeyId" };
+          } else if (error?.name === "SignatureDoesNotMatch") {
+            return { success: false, message: "R2: Secret key mismatch" };
+          } else if (error?.$metadata?.httpStatusCode === 403) {
+            return { success: false, message: "R2: Access denied. Check credentials and permissions" };
+          } else if (error?.message?.includes("NoSuchBucket")) {
+            return { success: false, message: "R2: Bucket does not exist" };
+          }
+          throw error;
+        }
+      }
+
+      default:
+        return { success: false, message: `Unsupported platform` };
+    }
+  } catch (error: any) {
+    console.error("Connection test error:", error);
+    return { 
+      success: false, 
+      message: `Connection failed: ${error?.message || error}` 
+    };
   }
 };

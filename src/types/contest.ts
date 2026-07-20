@@ -12,10 +12,16 @@ export interface Sample {
 export type ProblemFormat = "typst" | "latex" | "markdown";
 
 // 题目元数据
+export interface ProblemLimit {
+  key: string;
+  value: string;
+}
+
 export interface ProblemMetadata {
   display_name: string;
   format?: ProblemFormat; // 默认为 typst
   samples: Sample[];
+  limits?: ProblemLimit[];
 }
 
 // 题目描述
@@ -126,6 +132,8 @@ export interface COSConfig {
   secretKey: string;
   bucket: string;
   region: string;
+  directory?: string; // 可选的目录前缀
+  contestTitle?: string;
 }
 
 export interface OSSConfig {
@@ -134,6 +142,8 @@ export interface OSSConfig {
   accessKeySecret: string;
   bucket: string;
   region: string;
+  directory?: string; // 可选的目录前缀
+  contestTitle?: string;
 }
 
 export interface GitHubConfig {
@@ -141,6 +151,7 @@ export interface GitHubConfig {
   token: string;
   repo: string;
   directory?: string;
+  contestTitle?: string;
 }
 
 export interface R2Config {
@@ -149,6 +160,8 @@ export interface R2Config {
   secretAccessKey: string;
   bucket: string;
   accountId: string;
+  directory?: string;
+  contestTitle?: string;
 }
 
 export type OnlineSyncConfig = COSConfig | OSSConfig | GitHubConfig | R2Config;

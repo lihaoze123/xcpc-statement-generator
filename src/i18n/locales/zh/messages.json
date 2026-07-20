@@ -28,6 +28,10 @@
   "downloadFont": "下载字体",
   "requestFontAccess": "请求访问本机字体",
   "fontAccessDescription": "允许访问本机字体可减少下载量。",
+  "downloadEnhancedFontsTitle": "下载方正字体以获得更好的渲染效果？",
+  "downloadEnhancedFontsDescription": "下载约 48 MB 的方正字体包，可获得与原模板更一致的排版效果。若不下载，将使用本机 Windows、Noto 或 Source Han 字体回退，预览仍可正常使用。此选择会被记住。",
+  "downloadEnhancedFonts": "下载字体（约 48 MB）",
+  "useFallbackFonts": "使用回退字体",
   "initializingTypst": "正在初始化 Typst 编译器...",
   "downloadingCompiler": "正在下载编译器和字体",
   "versionControl": {

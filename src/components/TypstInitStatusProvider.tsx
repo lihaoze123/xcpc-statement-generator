@@ -1,10 +1,15 @@
 import { type FC, type ReactNode, useEffect, useState } from "react";
-import { typstInitStatus, fontAccessConfirmResolve } from "@/compiler";
+import {
+  typstInitStatus,
+  fontAccessConfirmResolve,
+  fontDownloadConfirmResolve,
+} from "@/compiler";
 import { useTranslation } from "react-i18next";
 
 const TypstInitStatusProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const [status, setStatus] = useState(typstInitStatus);
-  const [showFontModal, setShowFontModal] = useState(false);
+  const [showFontAccessModal, setShowFontAccessModal] = useState(false);
+  const [showFontDownloadModal, setShowFontDownloadModal] = useState(false);
   const { t } = useTranslation();
 
   useEffect(() => {
@@ -15,7 +20,11 @@ const TypstInitStatusProvider: FC<{ children: ReactNode }> = ({ children }) => {
 
       // Check if font access confirmation is needed
       if (fontAccessConfirmResolve) {
-        setShowFontModal(true);
+        setShowFontAccessModal(true);
+      }
+
+      if (fontDownloadConfirmResolve) {
+        setShowFontDownloadModal(true);
       }
 
       if (typstInitStatus === "pending") {
@@ -30,8 +39,13 @@ const TypstInitStatusProvider: FC<{ children: ReactNode }> = ({ children }) => {
   }, []);
 
   const handleConfirmFont = () => {
-    setShowFontModal(false);
+    setShowFontAccessModal(false);
     fontAccessConfirmResolve?.();
+  };
+
+  const handleFontDownloadChoice = (download: boolean) => {
+    setShowFontDownloadModal(false);
+    fontDownloadConfirmResolve?.(download);
   };
 
   return (
@@ -46,14 +60,31 @@ const TypstInitStatusProvider: FC<{ children: ReactNode }> = ({ children }) => {
           </div>
         </div>
       )}
-      {showFontModal && (
-        <div className="modal modal-open">
+      {showFontAccessModal && (
+        <div className="modal modal-open z-[60]">
           <div className="modal-box">
             <h3 className="font-bold text-lg">{t('messages:requestFontAccess')}</h3>
             <p className="py-4">{t('messages:fontAccessDescription')}</p>
             <div className="modal-action">
               <button className="btn btn-primary" onClick={handleConfirmFont}>
                 {t('common:confirm')}
+              </button>
+            </div>
+          </div>
+          <div className="modal-backdrop"></div>
+        </div>
+      )}
+      {showFontDownloadModal && (
+        <div className="modal modal-open z-[60]">
+          <div className="modal-box">
+            <h3 className="text-lg font-bold">{t('messages:downloadEnhancedFontsTitle')}</h3>
+            <p className="py-4">{t('messages:downloadEnhancedFontsDescription')}</p>
+            <div className="modal-action">
+              <button className="btn" onClick={() => handleFontDownloadChoice(false)}>
+                {t('messages:useFallbackFonts')}
+              </button>
+              <button className="btn btn-primary" onClick={() => handleFontDownloadChoice(true)}>
+                {t('messages:downloadEnhancedFonts')}
               </button>
             </div>
           </div>

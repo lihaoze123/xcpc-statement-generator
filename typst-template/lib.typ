@@ -3,10 +3,37 @@
 #import "@preview/mitex:0.2.6": *
 
 #let fonts = (
-  serif: ("New Computer Modern Math", "FZShuSong-Z01"),
-  sans: ("CMU Sans Serif", "FZHei-B01"),
-  kaishu: ("FZKai-Z03",),
-  songti-bold: ("New Computer Modern Math", "FZXiaoBiaoSong-B05"),
+  serif: (
+    "New Computer Modern Math",
+    "FZShuSong-Z01", "SimSun", "NSimSun", "FangSong", "Songti SC",
+    "Noto Serif CJK SC", "Noto Serif SC", "Source Han Serif",
+    "FZHei-B01", "FZKai-Z03", "FZXiaoBiaoSong-B05",
+    "Microsoft YaHei", "Microsoft YaHei UI", "SimHei", "DengXian", "KaiTi", "KaiTi_GB2312",
+    "Noto Sans CJK SC", "Noto Sans SC", "Source Han Sans",
+  ),
+  sans: (
+    "CMU Sans Serif",
+    "FZHei-B01", "Microsoft YaHei", "Microsoft YaHei UI", "SimHei", "DengXian",
+    "Noto Sans CJK SC", "Noto Sans SC", "Source Han Sans",
+    "FZShuSong-Z01", "FZKai-Z03", "FZXiaoBiaoSong-B05",
+    "SimSun", "FangSong", "KaiTi", "KaiTi_GB2312",
+    "Noto Serif CJK SC", "Source Han Serif",
+  ),
+  kaishu: (
+    "CMU Sans Serif",
+    "FZKai-Z03", "KaiTi", "KaiTi_GB2312", "Kaiti SC", "FangSong",
+    "FZShuSong-Z01", "FZHei-B01", "FZXiaoBiaoSong-B05",
+    "SimSun", "SimHei", "Microsoft YaHei", "DengXian",
+    "Noto Sans CJK SC", "Noto Sans SC", "Source Han Sans",
+  ),
+  songti-bold: (
+    "CMU Sans Serif",
+    "FZXiaoBiaoSong-B05", "SimHei", "Microsoft YaHei", "DengXian",
+    "Noto Sans CJK SC", "Noto Sans SC", "Source Han Sans",
+    "FZShuSong-Z01", "FZHei-B01", "FZKai-Z03",
+    "SimSun", "FangSong", "KaiTi", "KaiTi_GB2312",
+    "Noto Serif CJK SC", "Source Han Serif",
+  ),
   mono: ("CMU Typewriter Text",)
 )
 #let md = cmarker-render.with(math: mitex, scope: (image: (source, alt: none, format: auto) => image(source, alt: alt, format: format)))
@@ -47,6 +74,7 @@
     output: "输出格式",
     examples: "样例",
     note: "提示",
+    limits: "题目限制",
     problem-list: "试题列表",
     stdin: "standard input",
     stdout: "standard output",
@@ -58,6 +86,7 @@
     output: "Output",
     examples: "Examples",
     note: "Note",
+    limits: "Limits",
     problem-list: "Problem List",
     stdin: "standard input",
     stdout: "standard output",
@@ -69,6 +98,17 @@
 #let render-problem(problem, statement, language: "zh") = [
   #text(font: fonts.sans, size: 20.74pt, weight: "bold")[#problem.display-name]
   #v(3mm)
+
+  #if problem.at("limits", default: none) != none and problem.limits.len() > 0 [
+    #set text(size: 11pt)
+    #table(
+      columns: (4.2cm, 9.8cm),
+      align: (left, left),
+      stroke: none,
+      ..problem.limits.map(l => (strong(l.key + ":"), l.value)).flatten(),
+    )
+    #v(0.6em)
+  ]
 
   #let format = problem.at("format", default: "latex")
   #if format == "latex" {

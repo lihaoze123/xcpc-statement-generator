@@ -1,4 +1,4 @@
-import { type FC, useState, useCallback } from "react";
+import { type FC, useState, useCallback, useLayoutEffect, useRef } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faExpand, faCompress, faMagnifyingGlassPlus, faMagnifyingGlassMinus, faChevronLeft, faChevronRight } from "@fortawesome/free-solid-svg-icons";
 import Preview, { type PreviewHandle, type PreviewPageInfo } from "./Preview";
@@ -15,14 +15,29 @@ const PreviewArea: FC<PreviewAreaProps> = ({ data, previewRef, isFullscreen, set
   const [zoom, setZoom] = useState(100);
   const [pageInfo, setPageInfo] = useState<PreviewPageInfo>({ currentPage: 1, totalPages: 1 });
   const [pageInput, setPageInput] = useState("1");
+  const scrollRootRef = useRef<HTMLDivElement>(null);
+  const pageBeforeZoomRef = useRef<number | undefined>(undefined);
 
   const handlePageInfoChange = useCallback((info: PreviewPageInfo) => {
     setPageInfo(info);
     setPageInput(String(info.currentPage));
   }, []);
 
-  const handleZoomIn = () => setZoom(z => Math.min(200, z + 10));
-  const handleZoomOut = () => setZoom(z => Math.max(50, z - 10));
+  const handleZoomIn = () => {
+    pageBeforeZoomRef.current = pageInfo.currentPage;
+    setZoom(z => Math.min(200, z + 10));
+  };
+  const handleZoomOut = () => {
+    pageBeforeZoomRef.current = pageInfo.currentPage;
+    setZoom(z => Math.max(50, z - 10));
+  };
+
+  useLayoutEffect(() => {
+    const page = pageBeforeZoomRef.current;
+    if (page === undefined) return;
+    pageBeforeZoomRef.current = undefined;
+    previewRef.current?.jumpToPage(page, "auto");
+  }, [previewRef, zoom]);
 
   const jumpTo = (page: number) => {
     const target = Math.min(Math.max(1, page), Math.max(1, pageInfo.totalPages));
@@ -37,18 +52,24 @@ const PreviewArea: FC<PreviewAreaProps> = ({ data, previewRef, isFullscreen, set
   return (
     <div className={wrapperClass}>
       {/* Preview Content */}
-      <div className="flex-1 overflow-y-auto custom-scroll relative" style={{ padding: '24px' }}>
+      <div
+        ref={scrollRootRef}
+        className="custom-scroll relative flex-1 overflow-auto px-6 pb-28 pt-6"
+      >
         <div
-          className="mx-auto bg-white shadow-sm transition-transform duration-200 origin-top"
+          className="mx-auto"
           style={{
-            width: '210mm',
-            maxWidth: '100%',
-            minHeight: '297mm',
-            transform: `scale(${zoom / 100})`,
-            marginBottom: isFullscreen ? '100px' : '0'
+            width: `${zoom}%`,
+            maxWidth: `${210 * zoom / 100}mm`,
           }}
         >
-          <Preview ref={previewRef} data={data} onPageInfoChange={handlePageInfoChange} />
+          <Preview
+            ref={previewRef}
+            data={data}
+            zoom={zoom}
+            scrollRootRef={scrollRootRef}
+            onPageInfoChange={handlePageInfoChange}
+          />
         </div>
       </div>
 

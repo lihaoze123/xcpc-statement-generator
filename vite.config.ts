@@ -9,6 +9,18 @@ export default defineConfig(async (): Promise<UserConfig> => {
     const virtualModuleId = "virtual:typst-font-url-entries";
     const resolvedVirtualModuleId = "\0" + virtualModuleId;
     let pluginLoadResult: string | undefined = undefined;
+    const bundledFonts = [
+      ["New Computer Modern Math", "assets/fonts/NewCMMath-Book.otf"],
+      ["CMU Sans Serif", "assets/fonts/cmunss.otf"],
+      ["CMU Sans Serif Bold", "assets/fonts/cmunsx.otf"],
+      ["CMU Typewriter Text", "assets/fonts/cmuntt.ttf"],
+    ] as const;
+    const fangZhengFonts = [
+      ["FZShuSong-Z01", "assets/fonts/FZSSK.ttf"],
+      ["FZHei-B01", "assets/fonts/FZHTK.ttf"],
+      ["FZKai-Z03", "assets/fonts/FZKTK.ttf"],
+      ["FZXiaoBiaoSong-B05", "assets/fonts/FZXBSK.ttf"],
+    ] as const;
 
     return {
       name,
@@ -21,40 +33,23 @@ export default defineConfig(async (): Promise<UserConfig> => {
         if (id !== resolvedVirtualModuleId) return;
 
         if (!pluginLoadResult) {
-          const fs = await import("node:fs/promises");
-          const files = await fs.readdir("assets/fonts");
-
-          const fontAssetsUrls = await Promise.all(
-            files
-              .filter((file) =>
-                [".woff2", ".woff", ".ttf", ".otf"].some((ext) =>
-                  file.endsWith(ext),
-                ),
-              )
-              .map(async (file) => {
-                const fontkit = await import("fontkit");
-                const fontBuffer = await fs.readFile("assets/fonts/" + file);
-                const fontInfo = fontkit.create(fontBuffer);
-
-                if (!("postscriptName" in fontInfo))
-                  throw new Error(
-                    `Font file ${file} does not have a PostScript name.`,
-                  );
-
-                return [fontInfo.postscriptName, `assets/fonts/${file}`];
-              }),
-          );
-
+          const allFonts = [...bundledFonts, ...fangZhengFonts];
           pluginLoadResult =
-            fontAssetsUrls
+            allFonts
               .map(
                 ([, url], index) => `import font${index}Url from "${url}?url";\n`,
               )
               .join("") +
             "\n" +
             "const fontUrlEntries = [\n" +
-            fontAssetsUrls
+            bundledFonts
               .map(([name], index) => `  ["${name}", font${index}Url],\n`)
+              .join("") +
+            "];\n" +
+            "\n" +
+            "export const fangZhengFontUrlEntries = [\n" +
+            fangZhengFonts
+              .map(([name], index) => `  ["${name}", font${index + bundledFonts.length}Url],\n`)
               .join("") +
             "];\n" +
             "\n" +

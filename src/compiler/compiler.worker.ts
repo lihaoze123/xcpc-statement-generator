@@ -1,12 +1,15 @@
 import type { ContestWithImages } from "../types/contest";
 import {
-  $typst,
   createTypstCompiler,
-  createTypstRenderer,
   FetchPackageRegistry,
   loadFonts,
   MemoryAccessModel,
 } from "@myriaddreamin/typst.ts";
+import {
+  CompileFormatEnum,
+  type IncrementalServer,
+  type TypstCompiler,
+} from "@myriaddreamin/typst.ts/compiler";
 import type { PackageSpec } from "@myriaddreamin/typst.ts/internal.types";
 import {
   disableDefaultFontAssets,
@@ -15,8 +18,10 @@ import {
 } from "@myriaddreamin/typst.ts/options.init";
 
 import TypstTemplateLib from "typst-template/lib.typ?raw";
-import TypstCompilerWasmUrl from "@myriaddreamin/typst-ts-web-compiler/pkg/typst_ts_web_compiler_bg.wasm?url";
-import TypstRendererWasmUrl from "@myriaddreamin/typst-ts-renderer/pkg/typst_ts_renderer_bg.wasm?url";
+
+const workerScope = self as unknown as {
+  postMessage(message: unknown, transfer: Transferable[]): void;
+};
 
 const RequiredPackages = [
   { name: "oxifmt", version: "1.0.0", url: "https://packages.typst.org/preview/oxifmt-1.0.0.tar.gz" },
@@ -28,9 +33,21 @@ const RequiredPackages = [
 let isInitialized = false;
 let initPromise: Promise<void> | null = null;
 let preloadedPackages: Map<string, ArrayBuffer>;
+let typstCompiler: TypstCompiler;
+let incrementalServer: IncrementalServer;
+let incrementalRevision = 0;
+let compilerQueue: Promise<void> = Promise.resolve();
 
-// Store registered images (uuid -> ArrayBuffer)
-let registeredImages: Map<string, ArrayBuffer> = new Map();
+const queueCompilerOperation = <T>(operation: () => Promise<T> | T): Promise<T> => {
+  const result = compilerQueue.then(operation, operation);
+  compilerQueue = result.then(() => undefined, () => undefined);
+  return result;
+};
+
+// Images can arrive before compiler initialization, so retain them until the
+// virtual filesystem is ready. Once mapped, they stay in WASM across compiles.
+let registeredImages = new Map<string, ArrayBuffer>();
+let mappedImageIds = new Set<string>();
 
 const typstAccessModel = new MemoryAccessModel();
 
@@ -52,55 +69,84 @@ class PreloadedPackageRegistry extends FetchPackageRegistry {
 const typstPackageRegistry = new PreloadedPackageRegistry(typstAccessModel);
 
 async function downloadPackages(): Promise<Map<string, ArrayBuffer>> {
-  const packages = new Map<string, ArrayBuffer>();
-
-  for (const pkg of RequiredPackages) {
+  const packages = await Promise.all(RequiredPackages.map(async (pkg) => {
     const response = await fetch(pkg.url);
     if (!response.ok) {
       throw new Error(`Failed to download ${pkg.name}: ${response.status}`);
     }
-    const arrayBuffer = await response.arrayBuffer();
-    packages.set(pkg.url, arrayBuffer);
-  }
+    return [pkg.url, await response.arrayBuffer()] as const;
+  }));
 
-  return packages;
+  return new Map(packages);
 }
 
-async function initializeTypst(fontBuffers: ArrayBuffer[]) {
+// Start package downloads as soon as the worker is constructed. This overlaps
+// them with the compiler/font downloads happening on the main thread.
+let packageDownloadError: unknown;
+const preloadedPackagesPromise = downloadPackages().catch((error) => {
+  packageDownloadError = error;
+  return new Map<string, ArrayBuffer>();
+});
+
+async function startIncrementalSession(compiler: TypstCompiler): Promise<void> {
+  let markReady: (() => void) | undefined;
+  const ready = new Promise<void>((resolve) => {
+    markReady = resolve;
+  });
+
+  void compiler.withIncrementalServer(async (server) => {
+    incrementalServer = server;
+    markReady?.();
+
+    // Keep the callback alive for the lifetime of this worker. typst.ts frees
+    // the IncrementalServer as soon as the callback returns.
+    await new Promise<void>(() => undefined);
+  });
+
+  await ready;
+}
+
+function syncImagesToCompiler(): void {
+  if (!isInitialized) return;
+
+  for (const uuid of mappedImageIds) {
+    if (!registeredImages.has(uuid)) {
+      typstCompiler.unmapShadow(`/asset/${uuid}`);
+      mappedImageIds.delete(uuid);
+    }
+  }
+
+  for (const [uuid, buffer] of registeredImages) {
+    if (mappedImageIds.has(uuid)) continue;
+    typstCompiler.mapShadow(`/asset/${uuid}`, new Uint8Array(buffer));
+    mappedImageIds.add(uuid);
+  }
+}
+
+async function initializeTypst(fontBuffers: ArrayBuffer[], compilerWasm: ArrayBuffer) {
   if (isInitialized) return;
   if (initPromise) return initPromise;
 
   initPromise = (async () => {
-    preloadedPackages = await downloadPackages();
+    preloadedPackages = await preloadedPackagesPromise;
+    if (packageDownloadError) throw packageDownloadError;
 
-    const [compilerWasm, rendererWasm] = await Promise.all([
-      fetch(TypstCompilerWasmUrl).then(r => r.arrayBuffer()),
-      fetch(TypstRendererWasmUrl).then(r => r.arrayBuffer())
-    ]);
+    typstCompiler = createTypstCompiler();
+    await typstCompiler.init({
+      getModule: () => compilerWasm,
+      beforeBuild: [
+        disableDefaultFontAssets(),
+        loadFonts(fontBuffers.map(buf => new Uint8Array(buf))),
+        withAccessModel(typstAccessModel),
+        withPackageRegistry(typstPackageRegistry),
+      ],
+    });
 
-    const typstCompiler = createTypstCompiler();
-    const typstRenderer = createTypstRenderer();
-
-    await Promise.all([
-      typstCompiler.init({
-        getModule: () => compilerWasm,
-        beforeBuild: [
-          disableDefaultFontAssets(),
-          loadFonts(fontBuffers.map(buf => new Uint8Array(buf))),
-          withAccessModel(typstAccessModel),
-          withPackageRegistry(typstPackageRegistry),
-        ],
-      }),
-      typstRenderer.init({
-        getModule: () => rendererWasm,
-      }),
-    ]);
-
-    $typst.setCompiler(typstCompiler);
-    $typst.setRenderer(typstRenderer);
-    $typst.addSource("/lib.typ", TypstTemplateLib);
+    typstCompiler.addSource("/lib.typ", TypstTemplateLib);
+    await startIncrementalSession(typstCompiler);
 
     isInitialized = true;
+    syncImagesToCompiler();
   })();
 
   return initPromise;
@@ -112,18 +158,6 @@ function escapeTypstString(str: string): string {
     .replace(/"/g, '\\"')
     .replace(/\n/g, '\\n')
     .replace(/\r/g, '\\r');
-}
-
-// Add images to virtual filesystem using mapShadow
-async function addImagesToFilesystem(contest: ContestWithImages): Promise<void> {
-  for (const img of contest.images) {
-    const buffer = registeredImages.get(img.uuid);
-    if (buffer) {
-      // Add image to virtual filesystem at /asset/{uuid}
-      // Using mapShadow to map the path to binary content
-      $typst.mapShadow(`/asset/${img.uuid}`, new Uint8Array(buffer));
-    }
-  }
 }
 
 function buildTypstDocument(contest: ContestWithImages, problemKey?: string, userTemplate?: string): string {
@@ -144,7 +178,8 @@ function buildTypstDocument(contest: ContestWithImages, problemKey?: string, use
       problem: {
         display_name: p.problem.display_name,
         format: p.problem.format || "latex",
-        samples: p.problem.samples.map(s => ({ input: s.input, output: s.output }))
+        samples: p.problem.samples.map(s => ({ input: s.input, output: s.output })),
+        limits: (p.problem.limits || []).map(l => ({ key: l.key, value: l.value })),
       },
       statement: {
         description: p.statement.description,
@@ -172,6 +207,10 @@ function buildTypstDocument(contest: ContestWithImages, problemKey?: string, use
       display_name: "${escapeTypstString(p.problem.display_name)}",
       format: "${p.problem.format}",
       samples: (${p.problem.samples.map((s) => `(input: "${escapeTypstString(s.input)}", output: "${escapeTypstString(s.output)}")`).join(", ")}${p.problem.samples.length === 1 ? ',' : ''})
+      ${p.problem.limits && p.problem.limits.length > 0
+        ? `,
+      limits: (${p.problem.limits.map((l) => `(key: "${escapeTypstString(l.key)}", value: "${escapeTypstString(l.value)}")`).join(", ")}${p.problem.limits.length === 1 ? ',' : ''})`
+        : ""}
     ),
     statement: (
       description: "${escapeTypstString(p.statement.description)}",
@@ -198,28 +237,58 @@ function buildTypstDocument(contest: ContestWithImages, problemKey?: string, use
 async function compileToPdf(contest: ContestWithImages, problemKey?: string): Promise<Uint8Array> {
   if (!isInitialized) throw new Error("Typst compiler not initialized");
 
-  // Add images to virtual filesystem
-  await addImagesToFilesystem(contest);
-
   const doc = buildTypstDocument(contest, problemKey, contest.template);
-  $typst.addSource("/main.typ", doc);
+  typstCompiler.addSource("/main.typ", doc);
 
-  const pdf = await $typst.pdf({ mainFilePath: "/main.typ" });
-  if (!pdf) throw new Error("PDF compilation returned empty result");
-  return pdf;
+  const result = await typstCompiler.compile({
+    mainFilePath: "/main.typ",
+    format: CompileFormatEnum.pdf,
+    diagnostics: "full",
+  });
+  if (!result.result) throw new Error(formatDiagnostics(result.diagnostics));
+  return result.result;
 }
 
-async function renderToSvg(contest: ContestWithImages): Promise<string> {
+type IncrementalVectorUpdate = {
+  kind: "new" | "diff";
+  revision: number;
+  vector: Uint8Array;
+};
+
+function formatDiagnostics(diagnostics: unknown[] | undefined): string {
+  if (!diagnostics?.length) return "Typst compilation returned no output";
+
+  return diagnostics.map((diagnostic) => {
+    if (typeof diagnostic === "string") return diagnostic;
+    if (!diagnostic || typeof diagnostic !== "object") return String(diagnostic);
+    const item = diagnostic as Record<string, unknown>;
+    const location = [item.path, item.range].filter(Boolean).join(":");
+    const message = String(item.message || "Typst compilation failed");
+    return location ? `${location}: ${message}` : message;
+  }).join("\n");
+}
+
+async function compileIncrementalVector(contest: ContestWithImages): Promise<IncrementalVectorUpdate> {
   if (!isInitialized) throw new Error("Typst compiler not initialized");
 
-  // Add images to virtual filesystem
-  await addImagesToFilesystem(contest);
-
   const doc = buildTypstDocument(contest, undefined, contest.template);
-  $typst.addSource("/main.typ", doc);
+  typstCompiler.addSource("/main.typ", doc);
 
-  const svg = await $typst.svg({ mainFilePath: "/main.typ" });
-  return svg;
+  const result = await typstCompiler.compile({
+    mainFilePath: "/main.typ",
+    incrementalServer,
+    diagnostics: "full",
+  });
+  if (!result.result) throw new Error(formatDiagnostics(result.diagnostics));
+
+  const vector = new Uint8Array(result.result);
+  const revision = incrementalRevision;
+  incrementalRevision += 1;
+  return {
+    kind: revision === 0 ? "new" : "diff",
+    revision,
+    vector,
+  };
 }
 
 // Message handler
@@ -230,37 +299,57 @@ self.addEventListener('message', async (event) => {
   try {
     switch (type) {
       case "init":
-        await initializeTypst(data.fontBuffers || []);
+        await initializeTypst(data.fontBuffers || [], data.compilerWasm);
         self.postMessage({ id, success: true });
         break;
 
       case "registerImages":
-        // Register images for compilation
-        registeredImages.clear();
-        if (data.images) {
-          for (const [uuid, buffer] of Object.entries(data.images)) {
-            registeredImages.set(uuid, buffer as ArrayBuffer);
+        await queueCompilerOperation(() => {
+          registeredImages.clear();
+          if (data.images) {
+            for (const [uuid, buffer] of Object.entries(data.images)) {
+              registeredImages.set(uuid, buffer as ArrayBuffer);
+            }
           }
-        }
+          syncImagesToCompiler();
+        });
         self.postMessage({ id, success: true });
         break;
 
       case "compileTypst":
-        const pdf = await compileToPdf(data as ContestWithImages);
-        self.postMessage({ id, success: true, data: pdf });
+        {
+          const pdf = new Uint8Array(await queueCompilerOperation(
+            () => compileToPdf(data as ContestWithImages),
+          ));
+          workerScope.postMessage(
+            { id, success: true, data: pdf },
+            [pdf.buffer as ArrayBuffer],
+          );
+        }
         break;
 
       case "compileProblem": {
         const { contest, problemKey } = data;
-        const pdf = await compileToPdf(contest, problemKey);
-        self.postMessage({ id, success: true, data: pdf });
+        const pdf = new Uint8Array(await queueCompilerOperation(
+          () => compileToPdf(contest, problemKey),
+        ));
+        workerScope.postMessage(
+          { id, success: true, data: pdf },
+          [pdf.buffer as ArrayBuffer],
+        );
         break;
       }
 
-      case "renderTypst":
-        const svg = await renderToSvg(data as ContestWithImages);
-        self.postMessage({ id, success: true, data: svg });
+      case "compilePreview": {
+        const update = await queueCompilerOperation(
+          () => compileIncrementalVector(data as ContestWithImages),
+        );
+        workerScope.postMessage(
+          { id, success: true, data: update },
+          [update.vector.buffer as ArrayBuffer],
+        );
         break;
+      }
 
       default:
         self.postMessage({ id, success: false, error: `Unknown type: ${type}` });
