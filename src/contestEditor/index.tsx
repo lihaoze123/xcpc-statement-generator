@@ -125,6 +125,7 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
       description: problem.statement.description || "",
       input: problem.statement.input || "",
       output: problem.statement.output || "",
+      interaction: problem.statement.interaction || "",
       notes: problem.statement.notes || "",
     };
   };
@@ -475,8 +476,8 @@ const ContestEditorImpl: FC<{ initialData: ContestWithImages }> = ({ initialData
     updateContestData((draft) => {
       draft.problems.push({
         key: newKey,
-        problem: { display_name: "New Problem", samples: [{ input: "", output: "" }], limits: defaultProblemLimits.map((limit) => ({ ...limit })) },
-        statement: { description: "", input: "", output: "", notes: "" },
+        problem: { display_name: "New Problem", interactive: false, samples: [{ input: "", output: "" }], limits: defaultProblemLimits.map((limit) => ({ ...limit })) },
+        statement: { description: "", input: "", output: "", interaction: "", notes: "" },
       });
     });
     setActiveId(newKey);

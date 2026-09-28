@@ -178,6 +178,7 @@ function buildTypstDocument(contest: ContestWithImages, problemKey?: string, use
       problem: {
         display_name: p.problem.display_name,
         format: p.problem.format || "latex",
+        interactive: p.problem.interactive || false,
         samples: p.problem.samples.map(s => ({ input: s.input, output: s.output })),
         limits: (p.problem.limits || []).map(l => ({ key: l.key, value: l.value })),
       },
@@ -185,6 +186,7 @@ function buildTypstDocument(contest: ContestWithImages, problemKey?: string, use
         description: p.statement.description,
         input: p.statement.input || null,
         output: p.statement.output || null,
+        interaction: p.statement.interaction || null,
         notes: p.statement.notes || null
       }
     })),
@@ -206,6 +208,7 @@ function buildTypstDocument(contest: ContestWithImages, problemKey?: string, use
     problem: (
       display_name: "${escapeTypstString(p.problem.display_name)}",
       format: "${p.problem.format}",
+      interactive: ${p.problem.interactive},
       samples: (${p.problem.samples.map((s) => `(input: "${escapeTypstString(s.input)}", output: "${escapeTypstString(s.output)}")`).join(", ")}${p.problem.samples.length === 1 ? ',' : ''})
       ${p.problem.limits && p.problem.limits.length > 0
         ? `,
@@ -216,6 +219,7 @@ function buildTypstDocument(contest: ContestWithImages, problemKey?: string, use
       description: "${escapeTypstString(p.statement.description)}",
       ${p.statement.input ? `input: "${escapeTypstString(p.statement.input)}",` : ""}
       ${p.statement.output ? `output: "${escapeTypstString(p.statement.output)}",` : ""}
+      ${p.statement.interaction ? `interaction: "${escapeTypstString(p.statement.interaction)}",` : ""}
       ${p.statement.notes ? `notes: "${escapeTypstString(p.statement.notes)}"` : ""}
     )
   )`).join(", ")}${data.problems.length === 1 ? ',' : ''}),

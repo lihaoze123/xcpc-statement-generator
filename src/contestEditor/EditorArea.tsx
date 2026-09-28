@@ -376,6 +376,17 @@ const SingleProblemEditor: FC<{
             showLineNumbers={true}
           />
         );
+      case "interaction":
+        return (
+          <CodeMirrorEditor
+            value={problem.statement.interaction || ""}
+            onChange={(val) => onUpdate((p) => { p.statement.interaction = val; })}
+            language={lang}
+            minHeight="calc(100vh - 200px)"
+            vimMode={vimMode}
+            showLineNumbers={true}
+          />
+        );
       case "notes":
         return (
           <CodeMirrorEditor
@@ -427,6 +438,20 @@ const SingleProblemEditor: FC<{
               <FontAwesomeIcon icon={faFilePdf} />
             </button>
           )}
+          <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+            <span>{t('editor:interactiveProblem')}</span>
+            <input
+              type="checkbox"
+              className="toggle toggle-primary toggle-sm"
+              checked={problem.problem.interactive || false}
+              onChange={(e) => {
+                if (!e.target.checked && activeTab === "interaction") {
+                  setActiveTab("description");
+                }
+                onUpdate((p) => { p.problem.interactive = e.target.checked; });
+              }}
+            />
+          </label>
           <select
             className="select select-bordered select-sm w-32"
             value={problem.problem.format || "latex"}
@@ -458,7 +483,7 @@ const SingleProblemEditor: FC<{
       </div>
 
       {/* Tab Bar */}
-      <TabBar activeTab={activeTab} onTabChange={setActiveTab} />
+      <TabBar activeTab={activeTab} onTabChange={setActiveTab} interactive={problem.problem.interactive} />
 
       {/* Editor Content */}
       <div className="flex-1 min-h-0 overflow-y-auto custom-scroll p-4">
