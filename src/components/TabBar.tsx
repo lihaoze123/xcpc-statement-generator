@@ -1,10 +1,11 @@
 import type { FC } from "react";
 
-export type TabId = "description" | "input" | "output" | "notes" | "samples" | "limits";
+export type TabId = "description" | "input" | "output" | "interaction" | "notes" | "samples" | "limits";
 
 interface TabBarProps {
   activeTab: TabId;
   onTabChange: (tab: TabId) => void;
+  interactive?: boolean;
 }
 
 const tabs: { id: TabId; label: string }[] = [
@@ -12,14 +13,15 @@ const tabs: { id: TabId; label: string }[] = [
   { id: "description", label: "描述" },
   { id: "input", label: "输入" },
   { id: "output", label: "输出" },
+  { id: "interaction", label: "交互协议" },
   { id: "notes", label: "提示" },
   { id: "samples", label: "样例" },
 ];
 
-const TabBar: FC<TabBarProps> = ({ activeTab, onTabChange }) => {
+const TabBar: FC<TabBarProps> = ({ activeTab, onTabChange, interactive = false }) => {
   return (
     <div className="flex border-b border-gray-200 px-4">
-      {tabs.map((tab) => (
+      {tabs.filter((tab) => tab.id !== "interaction" || interactive).map((tab) => (
         <button
           key={tab.id}
           onClick={() => onTabChange(tab.id)}

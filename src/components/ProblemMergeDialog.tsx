@@ -24,6 +24,7 @@ interface ProblemMergeDialogProps {
     description: string;
     input: string;
     output: string;
+    interaction: string;
     notes: string;
   } | null;
 }
@@ -160,6 +161,7 @@ const ProblemMergeDialog: FC<ProblemMergeDialogProps> = ({
                         <div>描述：{localDetail?.description ? `${localDetail.description.slice(0, 80)}...` : "-"}</div>
                         {localDetail?.input && <div>输入：{localDetail.input.slice(0, 60)}...</div>}
                         {localDetail?.output && <div>输出：{localDetail.output.slice(0, 60)}...</div>}
+                        {localDetail?.interaction && <div>交互协议：{localDetail.interaction.slice(0, 60)}...</div>}
                         {localDetail?.notes && <div>备注：{localDetail.notes.slice(0, 60)}...</div>}
                       </div>
                     )}
@@ -187,6 +189,7 @@ const ProblemMergeDialog: FC<ProblemMergeDialogProps> = ({
                         <div>描述：{cloudDetail?.description ? `${cloudDetail.description.slice(0, 80)}...` : "-"}</div>
                         {cloudDetail?.input && <div>输入：{cloudDetail.input.slice(0, 60)}...</div>}
                         {cloudDetail?.output && <div>输出：{cloudDetail.output.slice(0, 60)}...</div>}
+                        {cloudDetail?.interaction && <div>交互协议：{cloudDetail.interaction.slice(0, 60)}...</div>}
                         {cloudDetail?.notes && <div>备注：{cloudDetail.notes.slice(0, 60)}...</div>}
                       </div>
                     )}

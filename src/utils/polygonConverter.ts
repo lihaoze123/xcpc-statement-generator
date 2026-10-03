@@ -19,6 +19,8 @@ interface PolygonProblemProperties {
   legend: string;
   input?: string;
   output?: string;
+  interactive?: boolean;
+  interaction?: string;
   notes?: string;
   sampleTests?: Array<{
     input: string;
@@ -322,11 +324,13 @@ export class PolygonContestConverter {
 
     // 检测格式
     const format = await this.detectFormat(problemId);
+    const interactive = this.detectInteractive(problemId, jsonContent);
 
     return {
       problem: {
         display_name: jsonContent.name || 'Unknown Problem',
         format,
+        interactive,
         samples: (jsonContent.sampleTests || []).map((test) => ({
           input: test.input,
           output: test.output,
@@ -336,9 +340,39 @@ export class PolygonContestConverter {
         description: jsonContent.legend || '',
         input: jsonContent.input,
         output: jsonContent.output,
+        interaction: jsonContent.interaction,
         notes: jsonContent.notes || undefined,
       },
     };
+  }
+
+  /**
+   * 检测是否为交互题
+   */
+  private detectInteractive(
+    problemId: string,
+    properties: PolygonProblemProperties
+  ): boolean {
+    if (typeof properties.interactive === 'boolean') {
+      return properties.interactive;
+    }
+
+    const problemXmlFile = this.findFile(
+      new RegExp(`problems/${problemId}/problem\\.xml$`)
+    );
+
+    if (problemXmlFile) {
+      const xmlContent =
+        typeof problemXmlFile.content === 'string'
+          ? problemXmlFile.content
+          : new TextDecoder().decode(problemXmlFile.content);
+
+      if (/<interactor(?:\s|>)/i.test(xmlContent)) {
+        return true;
+      }
+    }
+
+    return Boolean(properties.interaction?.trim());
   }
 
   /**
@@ -371,6 +405,7 @@ export class PolygonContestConverter {
       problem: {
         display_name: problemId,
         format: 'latex',
+        interactive: false,
         samples: [],
         limits: [],
       },

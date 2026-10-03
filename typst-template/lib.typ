@@ -72,6 +72,7 @@
   zh: (
     input: "输入格式",
     output: "输出格式",
+    interaction: "交互协议",
     examples: "样例",
     note: "提示",
     limits: "题目限制",
@@ -84,6 +85,7 @@
   en: (
     input: "Input",
     output: "Output",
+    interaction: "Interaction Protocol",
     examples: "Examples",
     note: "Note",
     limits: "Limits",
@@ -145,6 +147,20 @@
       md(statement.output)
     } else {
       eval(statement.output, mode: "markup")
+    }
+  ]
+
+  #if problem.at("interactive", default: false) and statement.at("interaction", default: none) != none and statement.interaction != "" [
+    #v(3.5pt)
+    #text(font: fonts.sans, size: 17.28pt, weight: "bold")[#translations.at(language).interaction]
+    #v(3.5pt)
+    #if format == "latex" {
+      let res = mitex-convert(mode: "text", statement.interaction)
+      eval(res, mode: "markup", scope: mitex-scope)
+    } else if format == "markdown" {
+      md(statement.interaction)
+    } else {
+      eval(statement.interaction, mode: "markup")
     }
   ]
 

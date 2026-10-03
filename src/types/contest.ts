@@ -20,6 +20,7 @@ export interface ProblemLimit {
 export interface ProblemMetadata {
   display_name: string;
   format?: ProblemFormat; // 默认为 typst
+  interactive?: boolean;
   samples: Sample[];
   limits?: ProblemLimit[];
 }
@@ -29,6 +30,7 @@ export interface ProblemStatement {
   description: string;
   input?: string;
   output?: string;
+  interaction?: string;
   notes?: string;
 }
 
